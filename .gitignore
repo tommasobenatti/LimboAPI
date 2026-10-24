@@ -95,3 +95,7 @@ run/
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+
+# Private, disposable compatibility fixtures
+tools/runtime-*/
+__pycache__/

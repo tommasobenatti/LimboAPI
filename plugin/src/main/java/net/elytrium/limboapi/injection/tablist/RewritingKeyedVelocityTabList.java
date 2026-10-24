@@ -36,7 +36,7 @@ public class RewritingKeyedVelocityTabList extends KeyedVelocityTabList implemen
   protected final Map<UUID, KeyedVelocityTabListEntry> entries;
 
   public RewritingKeyedVelocityTabList(ConnectedPlayer player, ProxyServer proxyServer) {
-    super(player, proxyServer);
+    super(player, (com.velocitypowered.proxy.VelocityServer) proxyServer);
     this.player = super.player;
     this.connection = super.connection;
     this.proxyServer = super.proxyServer;

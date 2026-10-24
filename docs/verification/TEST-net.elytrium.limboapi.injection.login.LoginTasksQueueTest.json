@@ -1,0 +1,44 @@
+{
+  "tests": 9,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "brokenPermissionProviderClosesLoginAndReleasesReferences()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "finalizationReleasesCtdLoginIdentityLock()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "lateRegistrationDoesNotReviveDisconnectedPlayer()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "rejectedRegistrationNeverConnectsBackend()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "registrationFailureClosesConnection()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "asynchronousRegistrationWaitsForResultAndResumesOnPlayerLoop()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "loginMarksDisconnectLifecycleBeforeFiringLoginEvent()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "repeatedNextCannotFireProfileAndInitializeTwice()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    },
+    {
+      "name": "registrationBridgeDoesNotBlockOrReplaceTheResult()",
+      "classname": "net.elytrium.limboapi.injection.login.LoginTasksQueueTest"
+    }
+  ]
+}

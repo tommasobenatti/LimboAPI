@@ -1,0 +1,36 @@
+{
+  "tests": 7,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "releaseCountsSessionOnceEvenBeforeConfigFinishes()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "liveStateSwitchPreservesPluginLoginState()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "releaseCancelsAllTasksAndNotifiesOnce()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "forwardsResourcePackStatusThroughVelocityInBothStates()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "limitsBurstsWithoutAccumulatingBytesForTheWholeSession()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "keepAliveWaitsForClientToEnterPlay()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "closedConnectionCleansPluginStateBeforeVelocityLoginEvent()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    }
+  ]
+}

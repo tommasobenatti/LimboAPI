@@ -1,0 +1,36 @@
+{
+  "tests": 7,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "boundsBacklogAndReleasesItOnOverflow()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "liveStateSwitchPreservesPluginLoginState()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "boundsRetainedBytesAndDoesNotRetainAfterRejection()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "disconnectCompletesWaitingConfirmationExceptionally()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "releasesRetainedPacketsExactlyOnceOnRepeatedDisconnect()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "failedTransitionReleasesPacketsWithoutReplayingThem()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    },
+    {
+      "name": "closedConnectionCleansPluginStateBeforeVelocityLoginEvent()",
+      "classname": "net.elytrium.limboapi.injection.login.confirmation.LoginConfirmHandlerTest"
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "nlogin_included": true,
+  "limits": [
+    "No premium account, license, production settings, database or credentials copied.",
+    "Synthetic protocol765 client; no resource rendering, auth success or playable world asserted.",
+    "Fake backend is local and supplies only login and CONFIG finish packets."
+  ],
+  "startup_done": true,
+  "attempts": [
+    {
+      "label": "initial",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 27
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "0e21ea39-53a2-33fd-99ba-ef58b41aed4b",
+        "url": "http://127.0.0.1:50788/pack.zip#d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66",
+        "sha1": "d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66"
+      },
+      "same_connection_hold_seconds": 36.00048187500215,
+      "same_connection_hold_completed": true,
+      "packets_received_during_hold": [],
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    },
+    {
+      "label": "repeat",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 27
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "0e21ea39-53a2-33fd-99ba-ef58b41aed4b",
+        "url": "http://127.0.0.1:50788/pack.zip#d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66",
+        "sha1": "d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66"
+      },
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    },
+    {
+      "label": "after-same-session-hold",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 27
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "0e21ea39-53a2-33fd-99ba-ef58b41aed4b",
+        "url": "http://127.0.0.1:50788/pack.zip#d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66",
+        "sha1": "d914bbbf1f400d0947d8cb3c2a0e9ad3daccdb66"
+      },
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    }
+  ],
+  "reloads": [
+    {
+      "number": 1,
+      "sha256_before": {
+        "plugins/limboapi/config.yml": "1b43895febe9dfbcae71487e49d983056a796420c1447d61df5ed7380fa6b51c",
+        "plugins/limboreconnect/config.yml": "0e42dadb28ce79758bf00dea1fa5f06c5d238ee7dd6946ab5fad8f31b3ff8879"
+      },
+      "sha256_after": {
+        "plugins/limboapi/config.yml": "1b43895febe9dfbcae71487e49d983056a796420c1447d61df5ed7380fa6b51c",
+        "plugins/limboreconnect/config.yml": "0e42dadb28ce79758bf00dea1fa5f06c5d238ee7dd6946ab5fad8f31b3ff8879"
+      },
+      "unchanged": true,
+      "comment_and_empty_unknown_list_preserved": true
+    },
+    {
+      "number": 2,
+      "sha256_before": {
+        "plugins/limboapi/config.yml": "1b43895febe9dfbcae71487e49d983056a796420c1447d61df5ed7380fa6b51c",
+        "plugins/limboreconnect/config.yml": "0e42dadb28ce79758bf00dea1fa5f06c5d238ee7dd6946ab5fad8f31b3ff8879"
+      },
+      "sha256_after": {
+        "plugins/limboapi/config.yml": "1b43895febe9dfbcae71487e49d983056a796420c1447d61df5ed7380fa6b51c",
+        "plugins/limboreconnect/config.yml": "0e42dadb28ce79758bf00dea1fa5f06c5d238ee7dd6946ab5fad8f31b3ff8879"
+      },
+      "unchanged": true,
+      "comment_and_empty_unknown_list_preserved": true
+    }
+  ],
+  "backend_events": [
+    {
+      "backend_login": "Smoke765+",
+      "protocol": 765
+    },
+    {
+      "backend_ack": 3
+    },
+    {
+      "backend_config_finished": 2
+    },
+    {
+      "backend_end": "connection closed"
+    },
+    {
+      "backend_login": "Smoke765+",
+      "protocol": 765
+    },
+    {
+      "backend_ack": 3
+    },
+    {
+      "backend_config_finished": 2
+    },
+    {
+      "backend_end": "connection closed"
+    },
+    {
+      "backend_login": "Smoke765+",
+      "protocol": 765
+    },
+    {
+      "backend_ack": 3
+    },
+    {
+      "backend_config_finished": 2
+    },
+    {
+      "backend_end": "connection closed"
+    }
+  ],
+  "binary_errors": [],
+  "forcepack_success_observed": true,
+  "api_reload_completions": 2,
+  "reconnect_reload_completions": 2,
+  "nlogin_profile_hook_active": true,
+  "upstream_version_check_failed": false,
+  "process_exit": 0,
+  "artifact_stage": "Original pre-commit compatibility verification; release SHA256SUMS identifies rebuilt tagged artifacts."
+}

@@ -15,7 +15,12 @@ tasks.withType<JavaCompile> {
 }
 
 dependencies {
-    compileOnly(libs.minecraft.velocity.api)
+    compileOnly("org.checkerframework:checker-qual:4.2.3")
+    if (project.hasProperty("velocityCtdJar")) {
+        compileOnly(files(project.property("velocityCtdJar")))
+    } else {
+        compileOnly(libs.minecraft.velocity.api)
+    }
     api(libs.elytrium.commons.config)
     api(libs.elytrium.commons.utils)
     api(libs.elytrium.commons.velocity)

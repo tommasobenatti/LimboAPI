@@ -1,0 +1,56 @@
+{
+  "tests": 12,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "anotherPluginsRedirectResultCannotBeOverriddenByReconnect()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "preLimboAuthenticationRunsOnceAndProfileReplayPreservesTheOriginalConnection()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "concurrentConnectionWithSameProfileCannotConsumeAnotherEventsBypassMarker()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "cancellingProfileReplayClearsItsBypassBeforeAnotherDispatch()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "failedLoginHookTerminatesOriginalEventExceptionally()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "unchangedDefaultRedirectResultAllowsReconnectToHandleTheKick()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "preLimboAuthenticationMaintainsVelocityPriorityOrder()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "removingPreLimboPluginFromSettingsRestoresItsHandlersAndReloadIsIdempotent()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "handledKickTerminatesFutureWithoutRunningVanillaOrLaterHandlers()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "absentOrFailedKickCallbackAllowsNormalKickHandling()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "movingPreLimboHandlersInvalidatesPreviouslyBakedVelocityCache()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    },
+    {
+      "name": "securityPluginDisconnectResultCannotBeOverriddenByReconnect()",
+      "classname": "net.elytrium.limboapi.injection.event.EventManagerHookTest"
+    }
+  ]
+}

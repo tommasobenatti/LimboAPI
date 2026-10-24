@@ -53,15 +53,12 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import net.elytrium.commons.config.YamlConfig;
 import net.elytrium.commons.kyori.serialization.Serializer;
 import net.elytrium.commons.kyori.serialization.Serializers;
 import net.elytrium.commons.utils.reflection.ReflectionException;
@@ -148,9 +145,9 @@ public class LimboAPI implements LimboFactory {
   private final CachedPackets packets;
   private final PacketFactory packetFactory;
   private final SimpleItemComponentManager itemComponentManager = new SimpleItemComponentManager();
-  private final HashMap<Player, LoginTasksQueue> loginQueue;
-  private final HashMap<Player, Function<KickedFromServerEvent, Boolean>> kickCallback;
-  private final HashMap<Player, RegisteredServer> nextServer;
+  private final Map<Player, LoginTasksQueue> loginQueue;
+  private final Map<Player, Function<KickedFromServerEvent, Boolean>> kickCallback;
+  private final Map<Player, RegisteredServer> nextServer;
 
   private PreparedPacketFactory preparedPacketFactory;
   private PreparedPacketFactory configPreparedPacketFactory;
@@ -169,12 +166,12 @@ public class LimboAPI implements LimboFactory {
     this.server = (VelocityServer) server;
     this.metricsFactory = metricsFactory;
     this.configFile = dataDirectory.resolve("config.yml").toFile();
-    this.players = new HashSet<>();
+    this.players = ConcurrentHashMap.newKeySet();
     this.packetFactory = new PacketFactoryImpl();
     this.packets = new CachedPackets(this);
-    this.loginQueue = new HashMap<>();
-    this.kickCallback = new HashMap<>();
-    this.nextServer = new HashMap<>();
+    this.loginQueue = new ConcurrentHashMap<>();
+    this.kickCallback = new ConcurrentHashMap<>();
+    this.nextServer = new ConcurrentHashMap<>();
 
     int maximumProtocolVersionNumber = ProtocolVersion.MAXIMUM_VERSION.getProtocol();
     if (maximumProtocolVersionNumber < SUPPORTED_MAXIMUM_PROTOCOL_VERSION_NUMBER) {
@@ -208,7 +205,11 @@ public class LimboAPI implements LimboFactory {
   public void onProxyInitialization(ProxyInitializeEvent event) {
     Settings.IMP.setLogger(LOGGER);
 
-    if (Settings.IMP.reload(this.configFile, Settings.IMP.PREFIX) == YamlConfig.LoadResult.CONFIG_NOT_EXISTS) {
+    boolean firstLaunch = !this.configFile.exists();
+    if (!this.loadSettings()) {
+      throw new IllegalStateException("Unable to load LimboAPI configuration safely");
+    }
+    if (firstLaunch) {
       LOGGER.warn("************* FIRST LAUNCH *************");
       LOGGER.warn("Thanks for installing LimboAPI!");
       LOGGER.warn("(C) 2021 - 2024 Elytrium");
@@ -260,7 +261,6 @@ public class LimboAPI implements LimboFactory {
         true,
         Settings.IMP.MAIN.COMPATIBILITY_MODE
     );
-    this.reloadPreparedPacketFactory();
     this.reload();
 
     this.metricsFactory.make(this, 12530);
@@ -280,8 +280,44 @@ public class LimboAPI implements LimboFactory {
     this.eventManagerHook.reloadHandlers();
   }
 
-  public void reload() {
-    Settings.IMP.reload(this.configFile, Settings.IMP.PREFIX);
+  private boolean loadSettings() {
+    Settings candidate = new Settings();
+    candidate.setLogger(LOGGER);
+    try {
+      SafeConfigUpdater.update(this.configFile.toPath(), Settings::writeDefaults,
+          path -> candidate.loadCandidate(path) && this.validateSettings(candidate));
+      Settings.IMP.PREFIX = candidate.PREFIX;
+      Settings.IMP.SERIALIZER = candidate.SERIALIZER;
+      Settings.IMP.MAIN = candidate.MAIN;
+      return true;
+    } catch (IOException | RuntimeException exception) {
+      LOGGER.error("Unable to load config.yml safely; retaining the previous configuration", exception);
+      return false;
+    }
+  }
+
+  private boolean validateSettings(Settings settings) {
+    try {
+      Settings.MAIN main = settings.MAIN;
+      ProtocolVersion minimum = ProtocolVersion.valueOf("MINECRAFT_" + main.PREPARE_MIN_VERSION);
+      ProtocolVersion maximum = "LATEST".equals(main.PREPARE_MAX_VERSION) ? ProtocolVersion.MAXIMUM_VERSION
+          : ProtocolVersion.valueOf("MINECRAFT_" + main.PREPARE_MAX_VERSION);
+      return minimum.compareTo(maximum) <= 0 && settings.SERIALIZER.getSerializer() != null
+          && main.MAX_CHAT_MESSAGE_LENGTH >= 0 && main.MAX_BRAND_NAME_LENGTH >= 0 && main.MAX_UNKNOWN_PACKET_LENGTH >= 0
+          && main.MAX_SINGLE_GENERIC_PACKET_LENGTH >= 0 && main.MAX_MULTI_GENERIC_PACKET_LENGTH >= 0
+          && main.MAX_PACKET_LENGTH_TO_SUPPRESS_IT >= 0 && main.CHUNKS_PER_TICK > 0 && main.CHUNK_RADIUS_SEND_ON_SPAWN >= 0
+          && main.VIEW_DISTANCE >= 0 && main.SIMULATION_DISTANCE >= 0 && main.CHAT_SESSION_PACKET_TIMEOUT >= 0
+          && (!main.COMPATIBILITY_MODE || main.SAVE_UNCOMPRESSED_PACKETS)
+          && (this.preparedPacketFactory == null || main.COMPATIBILITY_MODE == Settings.IMP.MAIN.COMPATIBILITY_MODE);
+    } catch (RuntimeException exception) {
+      return false;
+    }
+  }
+
+  public synchronized void reload() {
+    if (!this.loadSettings()) {
+      return;
+    }
     ComponentSerializer<Component, Component, String> serializer = Settings.IMP.SERIALIZER.getSerializer();
     if (serializer == null) {
       LOGGER.warn("The specified serializer could not be founded, using default. (LEGACY_AMPERSAND)");
@@ -291,16 +327,23 @@ public class LimboAPI implements LimboFactory {
     }
 
     LOGGER.info("Creating and preparing packets...");
+    this.reloadPreparedPacketFactory();
     this.reloadVersion();
     this.packets.createPackets();
-    this.loginListener = new LoginListener(this, this.server);
-    this.eventManagerHook = new EventManagerHook(this, this.server.getEventManager());
     VelocityEventManager eventManager = this.server.getEventManager();
-    eventManager.unregisterListeners(this);
-    eventManager.register(this, this.loginListener);
-    eventManager.register(this, this.eventManagerHook);
-    eventManager.register(this, new DisconnectListener(this));
-    eventManager.register(this, new ReloadListener(this));
+    if (this.loginListener == null) {
+      this.loginListener = new LoginListener(this, this.server);
+      this.eventManagerHook = new EventManagerHook(this, eventManager);
+      eventManager.register(this, this.loginListener);
+      eventManager.register(this, this.eventManagerHook);
+      eventManager.register(this, new DisconnectListener(this));
+      eventManager.register(this, new ReloadListener(this));
+    }
+    try {
+      this.eventManagerHook.reloadHandlers();
+    } catch (IllegalAccessException exception) {
+      throw new ReflectionException(exception);
+    }
 
     LOGGER.info("Loaded!");
   }
@@ -543,8 +586,9 @@ public class LimboAPI implements LimboFactory {
 
   @Override
   public void passLoginLimbo(Player player) {
-    if (this.loginQueue.containsKey(player)) {
-      this.loginQueue.get(player).next();
+    LoginTasksQueue queue = this.loginQueue.get(player);
+    if (queue != null) {
+      queue.next();
     }
   }
 
@@ -619,7 +663,11 @@ public class LimboAPI implements LimboFactory {
   }
 
   public void setKickCallback(Player player, Function<KickedFromServerEvent, Boolean> queue) {
-    this.kickCallback.put(player, queue);
+    if (queue == null) {
+      this.kickCallback.remove(player);
+    } else {
+      this.kickCallback.put(player, queue);
+    }
   }
 
   public void removeKickCallback(Player player) {
@@ -656,6 +704,14 @@ public class LimboAPI implements LimboFactory {
 
   public UUID getInitialID(Player player) {
     return INITIAL_ID.get(player);
+  }
+
+  public void releasePlayer(Player player) {
+    this.unsetLimboJoined(player);
+    this.removeLoginQueue(player);
+    this.removeKickCallback(player);
+    this.removeNextServer(player);
+    this.removeInitialID(player);
   }
 
   public LoginListener getLoginListener() {

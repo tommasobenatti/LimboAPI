@@ -1,74 +1,46 @@
-name: Java CI with Gradle
+name: Velocity-CTD CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   pull_request:
-    branches:
-      - master
+    branches: [master]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
-      - name: Set up JDK
+      - name: Set up JDK 25
         uses: actions/setup-java@v4.7.0
         with:
           distribution: temurin
           java-version: 25
-      - name: Cache generated data
-        uses: actions/cache@v5.0.4
-        with:
-          path: |
-            plugin/build/minecraft/
-            plugin/build/generated/minecraft/mapping/
-          key: minecraft-${{ hashFiles('gradle.properties') }}
-      - name: Build LimboAPI
-        run: ./gradlew build
-      - name: Upload LimboAPI
+      - name: Download verified Velocity-CTD 410
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/velocity-ctd.jar" https://github.com/GemstoneGG/Velocity-CTD/releases/download/build-410/velocity-ctd-fatjar-4.3.1-SNAPSHOT-410.jar
+          echo "7ec86cab7c4187e84ff0312ef2459bd70f96c5484552142b79b82d7c9d25a05d  $RUNNER_TEMP/velocity-ctd.jar" | sha256sum --check
+      - name: Download verified upstream mappings
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/limboapi-mappings.jar" https://github.com/Elytrium/LimboAPI/releases/download/dev-build/limboapi-1.1.27-SNAPSHOT.jar
+          echo "5d541984b90ca7a88eb49ca5f8cc3a803f5ecdfa6d7ed30b605b72ff94156e40  $RUNNER_TEMP/limboapi-mappings.jar" | sha256sum --check
+      - name: Build and verify
+        run: ./gradlew --no-daemon build "-PvelocityCtdJar=$RUNNER_TEMP/velocity-ctd.jar" "-PmappingsJar=$RUNNER_TEMP/limboapi-mappings.jar"
+      - name: Upload jar and test evidence
+        if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: LimboAPI
-          path: "*/build/libs/*.jar"
-      - uses: dev-drprasad/delete-tag-and-release@v0.2.1
-        if: ${{ github.event_name == 'push' }}
-        with:
-          delete_release: true
-          tag_name: dev-build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Find git version
-        id: git-version
-        run: echo "id=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Find correct JAR
-        if: ${{ github.event_name == 'push' }}
-        id: find-jar
-        run: |
-          output="$(find plugin/build/libs/ ! -name "*-javadoc.jar" ! -name "*-sources.jar" -type f -printf "%f\n")"
-          echo "::set-output name=jarname::$output"
-      - name: Release the build
-        if: ${{ github.event_name == 'push' }}
-        uses: ncipollo/release-action@v1
-        with:
-          artifacts: plugin/build/libs/${{ steps.find-jar.outputs.jarname }}
-          body: ${{ join(github.event.commits.*.message, '\n') }}
-          prerelease: true
-          name: Dev-build ${{ steps.git-version.outputs.id }}
-          tag: dev-build
-      - name: Upload to Modrinth
-        if: ${{ github.event_name == 'push' }}
-        uses: RubixDev/modrinth-upload@v1.0.0
-        with:
-          token: ${{ secrets.MODRINTH_TOKEN }}
-          file_path: plugin/build/libs/${{ steps.find-jar.outputs.jarname }}
-          name: Dev-build ${{ steps.git-version.outputs.id }}
-          version: ${{ steps.git-version.outputs.id }}
-          changelog: ${{ join(github.event.commits.*.message, '\n') }}
-          game_versions: 1.7.2
-          release_type: beta
-          loaders: velocity
-          featured: false
-          project_id: TZOteSf2
+          name: LimboAPI-CTD410-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            plugin/build/libs/limboapi-*-MCExp-CTD410.jar
+            plugin/build/test-results/test/TEST-*.xml
+            plugin/build/reports/checkstyle/*.xml

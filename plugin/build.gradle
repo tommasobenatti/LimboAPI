@@ -18,6 +18,7 @@ compileJava() {
 }
 
 dependencies() {
+  compileOnly("org.checkerframework:checker-qual:4.2.3")
   implementation(project(":api"))
   implementation(libs.elytrium.commons.config)
   implementation(libs.elytrium.commons.utils)
@@ -25,10 +26,17 @@ dependencies() {
   implementation(libs.elytrium.commons.kyori)
 
   implementation(libs.elytrium.fastprepare)
-  compileOnly(libs.minecraft.velocity.api)
-  annotationProcessor(libs.minecraft.velocity.api)
-  compileOnly(libs.minecraft.velocity.proxy) // From Elytrium Repo.
-  compileOnly(libs.minecraft.velocity.native)
+  if (project.hasProperty("velocityCtdJar")) {
+    compileOnly(files(project.property("velocityCtdJar")))
+    annotationProcessor(files(project.property("velocityCtdJar")))
+    testImplementation(files(project.property("velocityCtdJar")))
+  } else {
+    compileOnly(libs.minecraft.velocity.api)
+    annotationProcessor(libs.minecraft.velocity.api)
+    compileOnly(libs.minecraft.velocity.proxy) // From Elytrium Repo.
+    compileOnly(libs.minecraft.velocity.native)
+    testImplementation(libs.minecraft.velocity.proxy)
+  }
 
   // Needs for some velocity methods.
   compileOnly(libs.tool.netty.codec)
@@ -38,6 +46,20 @@ dependencies() {
   implementation(libs.minecraft.bstats.velocity)
 
   compileOnly(libs.tool.spotbugs.annotations)
+  implementation("org.yaml:snakeyaml:2.5")
+  testImplementation(platform("org.junit:junit-bom:5.13.4"))
+  testImplementation("org.junit.jupiter:junit-jupiter")
+  testImplementation("org.mockito:mockito-core:5.20.0")
+  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+test {
+  useJUnitPlatform()
+  jvmArgs("-XX:+EnableDynamicAgentLoading", "--enable-native-access=ALL-UNNAMED")
+}
+
+tasks.named("spotbugsTest") {
+  auxClassPaths.from(sourceSets.main.output, sourceSets.test.runtimeClasspath, configurations.compileClasspath)
 }
 
 shadowJar() {
@@ -52,6 +74,7 @@ shadowJar() {
   relocate("net.elytrium.commons.velocity", "net.elytrium.limboapi.thirdparty.commons.velocity")
   relocate("net.elytrium.commons.kyori", "net.elytrium.limboapi.thirdparty.commons.kyori")
   relocate("net.elytrium.commons.config", "net.elytrium.limboapi.thirdparty.commons.config")
+  relocate("org.yaml.snakeyaml", "net.elytrium.limboapi.thirdparty.snakeyaml")
 }
 
 license() {
@@ -198,19 +221,13 @@ project.ext.dataDirectory = new File(this.getLayout().getBuildDirectory().get().
 project.ext.generatedDir = new File(this.getLayout().getBuildDirectory().get().getAsFile(), "generated/minecraft")
 project.ext.versionManifestFile = new File(dataDirectory, "manifest.json")
 
-sourceSets {
-  main {
-    resources {
-      srcDirs += generatedDir
-    }
-  }
-}
-
 tasks.register("downloadManifest") {
+  doLast {
   this.println("> Downloading version manifest...")
   versionManifestFile.getParentFile().mkdirs()
   if (checkIsCacheValid(versionManifestFile)) {
     FileUtils.copyURLToFile(new URL(manifestUrl), versionManifestFile)
+  }
   }
 }
 
@@ -715,6 +732,9 @@ void generateTags(File targetDir, Map<MinecraftVersion, File> tagDirs) {
 
 tasks.register("generateMappings") {
   dependsOn(downloadManifest)
+  outputs.dir(generatedDir)
+
+  doLast {
 
   File targetDir = new File(generatedDir, "mapping")
   targetDir.mkdirs()
@@ -745,6 +765,20 @@ tasks.register("generateMappings") {
           })
 
   this.generateTags(targetDir, tags)
+  }
 }
 
-processResources.dependsOn(generateMappings)
+if (project.hasProperty("mappingsJar")) {
+  tasks.register("importMappings", Sync) {
+    from(zipTree(project.property("mappingsJar"))) {
+      include("mapping/*.json")
+      exclude { entry -> file("src/main/resources/${entry.path}").isFile() }
+    }
+    into(generatedDir)
+  }
+  processResources.dependsOn(importMappings)
+  sourceSets.main.resources.srcDir(tasks.named("importMappings"))
+} else {
+  processResources.dependsOn(generateMappings)
+  sourceSets.main.resources.srcDir(tasks.named("generateMappings"))
+}

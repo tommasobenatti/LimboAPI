@@ -1,0 +1,28 @@
+{
+  "tests": 5,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "rejectsKnownTypeErrorsIncludingOverflowAndBadListElements()",
+      "classname": "net.elytrium.limboapi.SettingsTest"
+    },
+    {
+      "name": "pristineDefaultsAreCompleteAndIncludeNloginBeforeLimbo()",
+      "classname": "net.elytrium.limboapi.SettingsTest"
+    },
+    {
+      "name": "doesNotAddNloginToAnExistingAdministratorPluginList()",
+      "classname": "net.elytrium.limboapi.SettingsTest"
+    },
+    {
+      "name": "acceptsUnknownAdministrativeKeysAndPreservesEmptyListsAndTranslationsOnDisk()",
+      "classname": "net.elytrium.limboapi.SettingsTest"
+    },
+    {
+      "name": "anExplicitEmptySchemaMapKeepsWorkingDefaultsWithoutReinsertingItsFields()",
+      "classname": "net.elytrium.limboapi.SettingsTest"
+    }
+  ]
+}

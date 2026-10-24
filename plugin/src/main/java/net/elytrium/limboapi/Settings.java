@@ -17,9 +17,26 @@
 
 package net.elytrium.limboapi;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import net.elytrium.commons.config.YamlConfig;
 import net.elytrium.commons.kyori.serialization.Serializers;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 public class Settings extends YamlConfig {
 
@@ -42,6 +59,96 @@ public class Settings extends YamlConfig {
 
   @Create
   public MAIN MAIN;
+
+  public Settings() {
+    this.MAIN = new MAIN();
+  }
+
+  /** Initializes Commons' original-default snapshot without ever loading an administrator file. */
+  public static void writeDefaults(Path path) throws IOException {
+    Path parent = path.toAbsolutePath().getParent();
+    if (parent == null) {
+      throw new IOException("Configuration requires a parent directory");
+    }
+    Path empty = Files.createTempFile(parent, ".settings-", ".tmp");
+    try {
+      Settings defaults = new Settings();
+      defaults.load(empty);
+      defaults.save(path);
+    } finally {
+      Files.deleteIfExists(empty);
+    }
+  }
+
+  /** Checks known fields strictly; extra administrator keys remain in the on-disk candidate. */
+  public boolean loadCandidate(Path path) {
+    LoaderOptions options = new LoaderOptions();
+    options.setAllowDuplicateKeys(false);
+    options.setMaxAliasesForCollections(0);
+    Yaml yaml = new Yaml(new SafeConstructor(options));
+    try (Reader reader = Files.newBufferedReader(path)) {
+      Map<String, Object> known = knownSettings(yaml.load(reader), Settings.class);
+      Path parent = path.toAbsolutePath().getParent();
+      if (parent == null) {
+        return false;
+      }
+      Path filtered = Files.createTempFile(parent, ".settings-", ".tmp");
+      try {
+        DumperOptions output = new DumperOptions();
+        output.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        Files.writeString(filtered, new Yaml(output).dump(known));
+        return this.load(filtered, this.PREFIX) == LoadResult.SUCCESS;
+      } finally {
+        Files.deleteIfExists(filtered);
+      }
+    } catch (IOException | RuntimeException exception) {
+      return false;
+    }
+  }
+
+  private static Map<String, Object> knownSettings(Object values, Class<?> schema) {
+    if (!(values instanceof Map<?, ?> mapping)) {
+      throw new IllegalArgumentException("Expected configuration mapping for " + schema.getSimpleName());
+    }
+    Map<String, Object> known = new LinkedHashMap<>();
+    for (Field field : schema.getFields()) {
+      if (Modifier.isStatic(field.getModifiers()) || field.isAnnotationPresent(Ignore.class)) {
+        continue;
+      }
+      String key = field.getName().toLowerCase(Locale.ROOT).replace('_', '-');
+      if (mapping.containsKey(key)) {
+        Object value = mapping.get(key);
+        if (field.getType() == List.class && value instanceof List<?> list) {
+          Class<?> element = (Class<?>) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[0];
+          List<Object> result = new ArrayList<>();
+          for (Object item : list) {
+            result.add(knownValue(item, element));
+          }
+          known.put(key, result);
+        } else {
+          known.put(key, knownValue(value, field.getType()));
+        }
+      }
+    }
+    return known;
+  }
+
+  private static Object knownValue(Object value, Class<?> type) {
+    if (value instanceof String && type == String.class || value instanceof Boolean && type == boolean.class) {
+      return value;
+    }
+    if (type == int.class && value instanceof Number number) {
+      return new BigDecimal(number.toString()).intValueExact();
+    }
+    if (type.isEnum() && value instanceof String text
+        && Arrays.stream(type.getEnumConstants()).anyMatch(constant -> ((Enum<?>) constant).name().equalsIgnoreCase(text))) {
+      return text.toUpperCase(Locale.ROOT);
+    }
+    if (value instanceof Map<?, ?> && !type.isPrimitive() && !type.isEnum() && type != String.class && type != List.class) {
+      return knownSettings(value, type);
+    }
+    throw new IllegalArgumentException("Invalid configuration value for " + type.getSimpleName());
+  }
 
   @Comment("Don't use \\n, use {NL} for new line, and {PRFX} for prefix.")
   public static class MAIN {
@@ -94,7 +201,7 @@ public class Settings extends YamlConfig {
     public String PREPARE_MAX_VERSION = "LATEST";
 
     @Comment("Helpful if you want some plugins proceed before LimboAPI. For example, it is needed to Floodgate to replace UUID.")
-    public List<String> PRE_LIMBO_PROFILE_REQUEST_PLUGINS = List.of("floodgate", "geyser");
+    public List<String> PRE_LIMBO_PROFILE_REQUEST_PLUGINS = List.of("floodgate", "geyser", "nlogin");
 
     @Comment("Should reduced debug info be enabled (reduced information in F3) if there is no preference for Limbo")
     public boolean REDUCED_DEBUG_INFO = false;
@@ -126,7 +233,7 @@ public class Settings extends YamlConfig {
     public boolean FORCE_DISABLE_MODERN_CHAT_SIGNING = true;
 
     @Create
-    public MESSAGES MESSAGES;
+    public MESSAGES MESSAGES = new MESSAGES();
 
     public static class MESSAGES {
 

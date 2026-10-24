@@ -35,7 +35,6 @@
 package net.elytrium.limboapi.injection.login;
 
 import com.velocitypowered.api.event.EventManager;
-import com.velocitypowered.api.event.connection.DisconnectEvent;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.connection.PostLoginEvent;
 import com.velocitypowered.api.event.permission.PermissionsSetupEvent;
@@ -59,14 +58,12 @@ import com.velocitypowered.proxy.protocol.packet.UpsertPlayerInfoPacket;
 import com.velocitypowered.proxy.protocol.packet.chat.ComponentHolder;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoop;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
@@ -98,6 +95,7 @@ public class LoginTasksQueue {
   private final ConnectedPlayer player;
   private final InboundConnection inbound;
   private final Queue<Runnable> queue;
+  private boolean finishing;
 
   public LoginTasksQueue(LimboAPI plugin, Object handler, VelocityServer server, ConnectedPlayer player,
                          InboundConnection inbound, Queue<Runnable> queue) {
@@ -111,14 +109,28 @@ public class LoginTasksQueue {
 
   public void next() {
     MinecraftConnection connection = this.player.getConnection();
-    if (connection.getChannel().isActive()) {
-      EventLoop eventLoop = connection.eventLoop();
-      if (this.queue.isEmpty()) {
-        eventLoop.execute(this::finish);
-      } else {
-        eventLoop.execute(Objects.requireNonNull(this.queue.poll()));
-      }
-    }
+    connection
+        .eventLoop()
+        .execute(
+            () -> {
+              if (this.finishing || connection.isClosed() || !connection.getChannel().isActive()) {
+                return;
+              }
+              try {
+                Runnable callback = this.queue.poll();
+                if (callback == null) {
+                  this.finishing = true;
+                  this.finish();
+                } else {
+                  callback.run();
+                }
+              } catch (Throwable throwable) {
+                LimboAPI.getLogger()
+                    .error("Exception while running login task for {}", this.player, throwable);
+                this.plugin.releasePlayer(this.player);
+                connection.close();
+              }
+            });
   }
 
   private void finish() {
@@ -128,72 +140,108 @@ public class LoginTasksQueue {
     MinecraftConnection connection = this.player.getConnection();
     Logger logger = LimboAPI.getLogger();
 
-    this.plugin.getEventManagerHook().proceedProfile(this.player.getGameProfile());
-    eventManager.fire(new GameProfileRequestEvent(this.inbound, this.player.getGameProfile(), this.player.isOnlineMode())).thenAcceptAsync(
-        gameProfile -> {
-          try {
-            UUID uuid = this.plugin.getInitialID(this.player);
-            if (connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_19_1) <= 0) {
-              connection.delayedWrite(new LegacyPlayerListItemPacket(
-                  LegacyPlayerListItemPacket.REMOVE_PLAYER,
-                  List.of(new LegacyPlayerListItemPacket.Item(uuid))
-              ));
+    this.plugin
+        .getEventManagerHook()
+        .fireProfileRequestEvent(
+            new GameProfileRequestEvent(
+                this.inbound, this.player.getGameProfile(), this.player.isOnlineMode()))
+        .thenAcceptAsync(
+            gameProfile -> {
+              try {
+                if (connection.isClosed()) {
+                  this.plugin.releasePlayer(this.player);
+                  return;
+                }
+                UUID uuid = this.plugin.getInitialID(this.player);
+                if (connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_19_1)
+                    <= 0) {
+                  connection.delayedWrite(
+                      new LegacyPlayerListItemPacket(
+                          LegacyPlayerListItemPacket.REMOVE_PLAYER,
+                          List.of(new LegacyPlayerListItemPacket.Item(uuid))));
 
-              connection.delayedWrite(new LegacyPlayerListItemPacket(
-                  LegacyPlayerListItemPacket.ADD_PLAYER,
-                  List.of(
-                      new LegacyPlayerListItemPacket.Item(uuid)
-                          .setName(gameProfile.getUsername())
-                          .setProperties(gameProfile.getGameProfile().getProperties())
-                  )
-              ));
-            } else if (connection.getState() != StateRegistry.CONFIG) {
-              UpsertPlayerInfoPacket.Entry playerInfoEntry = new UpsertPlayerInfoPacket.Entry(uuid);
-              playerInfoEntry.setDisplayName(new ComponentHolder(this.player.getProtocolVersion(), Component.text(gameProfile.getUsername())));
-              playerInfoEntry.setProfile(gameProfile.getGameProfile());
+                  connection.delayedWrite(
+                      new LegacyPlayerListItemPacket(
+                          LegacyPlayerListItemPacket.ADD_PLAYER,
+                          List.of(
+                              new LegacyPlayerListItemPacket.Item(uuid)
+                                  .setName(gameProfile.getUsername())
+                                  .setProperties(gameProfile.getGameProfile().getProperties()))));
+                } else if (connection.getState() != StateRegistry.CONFIG) {
+                  UpsertPlayerInfoPacket.Entry playerInfoEntry =
+                      new UpsertPlayerInfoPacket.Entry(uuid);
+                  playerInfoEntry.setDisplayName(
+                      new ComponentHolder(
+                          this.player.getProtocolVersion(),
+                          Component.text(gameProfile.getUsername())));
+                  playerInfoEntry.setProfile(gameProfile.getGameProfile());
 
-              connection.delayedWrite(new UpsertPlayerInfoPacket(
-                  EnumSet.of(
-                      UpsertPlayerInfoPacket.Action.UPDATE_DISPLAY_NAME,
-                      UpsertPlayerInfoPacket.Action.ADD_PLAYER),
-                  List.of(playerInfoEntry)));
-            }
+                  connection.delayedWrite(
+                      new UpsertPlayerInfoPacket(
+                          EnumSet.of(
+                              UpsertPlayerInfoPacket.Action.UPDATE_DISPLAY_NAME,
+                              UpsertPlayerInfoPacket.Action.ADD_PLAYER),
+                          List.of(playerInfoEntry)));
+                }
 
-            PROFILE_FIELD.invokeExact(this.player, gameProfile.getGameProfile());
+                PROFILE_FIELD.invokeExact(this.player, gameProfile.getGameProfile());
 
-            // From Velocity.
-            eventManager
-                .fire(new PermissionsSetupEvent(this.player, DEFAULT_PERMISSIONS))
-                .thenAcceptAsync(event -> {
-                  if (!connection.isClosed()) {
-                    // Wait for permissions to load, then set the players' permission function.
-                    PermissionFunction function = event.createFunction(this.player);
-                    if (function == null) {
-                      logger.error(
-                          "A plugin permission provider {} provided an invalid permission function"
-                              + " for player {}. This is a bug in the plugin, not in Velocity. Falling"
-                              + " back to the default permission function.",
-                          event.getProvider().getClass().getName(),
-                          this.player.getUsername()
-                      );
-                    } else {
-                      try {
-                        SET_PERMISSION_FUNCTION_METHOD.invokeExact(this.player, function);
-                      } catch (Throwable ex) {
-                        logger.error("Exception while completing injection to {}", this.player, ex);
-                      }
-                    }
-                    try {
-                      this.initialize(connection);
-                    } catch (Throwable e) {
-                      throw new ReflectionException(e);
-                    }
-                  }
-                }, connection.eventLoop());
-          } catch (Throwable e) {
-            logger.error("Exception while completing injection to {}", this.player, e);
-          }
-        }, connection.eventLoop());
+                // From Velocity.
+                eventManager
+                    .fire(new PermissionsSetupEvent(this.player, DEFAULT_PERMISSIONS))
+                    .thenAcceptAsync(
+                        event -> {
+                          if (!connection.isClosed()) {
+                            // Wait for permissions to load, then set the players' permission
+                            // function.
+                            PermissionFunction function = event.createFunction(this.player);
+                            if (function == null) {
+                              logger.error(
+                                  "A plugin permission provider {} provided an invalid permission"
+                                      + " function for player {}. This is a bug in the plugin, not"
+                                      + " in Velocity. Falling back to the default permission"
+                                      + " function.",
+                                  event.getProvider().getClass().getName(),
+                                  this.player.getUsername());
+                            } else {
+                              try {
+                                SET_PERMISSION_FUNCTION_METHOD.invokeExact(this.player, function);
+                              } catch (Throwable ex) {
+                                logger.error(
+                                    "Exception while completing injection to {}", this.player, ex);
+                              }
+                            }
+                            try {
+                              this.initialize(connection);
+                            } catch (Throwable e) {
+                              throw new ReflectionException(e);
+                            }
+                          }
+                        },
+                        connection.eventLoop())
+                    .exceptionally(
+                        throwable -> {
+                          logger.error(
+                              "Exception while loading permissions for {}", this.player, throwable);
+                          this.plugin.releasePlayer(this.player);
+                          connection.close();
+                          return null;
+                        });
+              } catch (Throwable e) {
+                logger.error("Exception while completing injection to {}", this.player, e);
+                this.plugin.releasePlayer(this.player);
+                connection.close();
+              }
+            },
+            connection.eventLoop())
+        .exceptionally(
+            throwable -> {
+              logger.error(
+                  "Exception while completing profile request for {}", this.player, throwable);
+              this.plugin.releasePlayer(this.player);
+              connection.close();
+              return null;
+            });
   }
 
   // From Velocity.
@@ -213,30 +261,65 @@ public class LoginTasksQueue {
 
     Logger logger = LimboAPI.getLogger();
     String serverIdHash = (String) SERVER_ID_HASH_GETTER.invokeExact((AuthSessionHandler) this.handler);
-    this.server.getEventManager().fire(new LoginEvent(this.player, serverIdHash)).thenAcceptAsync(event -> {
-      if (connection.isClosed()) {
-        // The player was disconnected.
-        this.server.getEventManager().fireAndForget(new DisconnectEvent(this.player, DisconnectEvent.LoginStatus.CANCELLED_BY_USER_BEFORE_COMPLETE));
-      } else {
-        Optional<Component> reason = event.getResult().getReasonComponent();
-        if (reason.isPresent()) {
-          this.player.disconnect0(reason.get(), false);
-        } else {
-          if (this.server.registerConnection(this.player)) {
-            if (connection.getActiveSessionHandler() instanceof LoginConfirmHandler confirm) {
-              confirm.waitForConfirmation(() -> this.connectToServer(logger, this.player, connection));
-            } else {
-              this.connectToServer(logger, this.player, connection);
-            }
-          } else {
-            this.player.disconnect0(Component.translatable("velocity.error.already-connected-proxy"), false);
-          }
-        }
-      }
-    }, connection.eventLoop()).exceptionally(t -> {
-      logger.error("Exception while completing login initialisation phase for {}", this.player, t);
-      return null;
-    });
+    VelocityLoginSupport.register(this.server, this.player)
+        .thenAcceptAsync(
+            registered -> {
+              if (connection.isClosed() || !Boolean.TRUE.equals(registered)) {
+                if (Boolean.TRUE.equals(registered)) {
+                  VelocityLoginSupport.teardown(this.player);
+                }
+                this.plugin.releasePlayer(this.player);
+                if (!connection.isClosed()) {
+                  this.player.disconnect0(
+                      Component.translatable("velocity.error.already-connected-proxy"), false);
+                }
+                return;
+              }
+              VelocityLoginSupport.markLoginEventFired(this.player);
+              this.server
+                  .getEventManager()
+                  .fire(new LoginEvent(this.player, serverIdHash))
+                  .thenAcceptAsync(
+                      event -> {
+                        if (connection.isClosed()) {
+                          VelocityLoginSupport.teardown(this.player);
+                          this.plugin.releasePlayer(this.player);
+                          return;
+                        }
+                        Optional<Component> reason = event.getResult().getReasonComponent();
+                        if (reason.isPresent()) {
+                          this.player.disconnect0(reason.get(), false);
+                        } else {
+                          if (connection.getActiveSessionHandler()
+                              instanceof LoginConfirmHandler confirm) {
+                            confirm.waitForConfirmation(
+                                () -> this.connectToServer(logger, this.player, connection));
+                          } else {
+                            this.connectToServer(logger, this.player, connection);
+                          }
+                        }
+                      },
+                      connection.eventLoop())
+                  .exceptionally(
+                      throwable -> {
+                        logger.error(
+                            "Exception while completing login initialisation phase for {}",
+                            this.player,
+                            throwable);
+                        VelocityLoginSupport.teardown(this.player);
+                        this.plugin.releasePlayer(this.player);
+                        connection.close();
+                        return null;
+                      });
+            },
+            connection.eventLoop())
+        .exceptionally(
+            throwable -> {
+              logger.error("Exception while registering {}", this.player, throwable);
+              this.plugin.releasePlayer(this.player);
+              connection.close();
+              return null;
+            });
   }
 
   @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
@@ -279,34 +362,65 @@ public class LoginTasksQueue {
       this.plugin.setActiveSessionHandler(connection, StateRegistry.CONFIG, configHandler);
     }
 
-    this.server.getEventManager().fire(new PostLoginEvent(this.player)).thenAccept(postLoginEvent -> {
-      try {
-        MC_CONNECTION_SETTER.accept(this.handler, connection);
-        CONNECT_TO_INITIAL_SERVER_METHOD.invoke((AuthSessionHandler) this.handler, this.player);
-      } catch (Throwable e) {
-        throw new ReflectionException(e);
-      }
-    });
+    this.server
+        .getEventManager()
+        .fire(new PostLoginEvent(this.player))
+        .whenComplete((event, throwable) -> VelocityLoginSupport.finalizeLogin(this.server, player))
+        .thenComposeAsync(
+            postLoginEvent -> {
+              if (connection.isClosed()) {
+                VelocityLoginSupport.teardown(player);
+                this.plugin.releasePlayer(player);
+                return CompletableFuture.completedFuture(null);
+              }
+              try {
+                MC_CONNECTION_SETTER.accept(this.handler, connection);
+                return (CompletableFuture<Void>)
+                    CONNECT_TO_INITIAL_SERVER_METHOD.invoke(
+                        (AuthSessionHandler) this.handler, this.player);
+              } catch (Throwable e) {
+                return CompletableFuture.<Void>failedFuture(e);
+              }
+            },
+            connection.eventLoop())
+        .exceptionally(
+            throwable -> {
+              logger.error(
+                  "Exception while connecting {} to its initial server", player, throwable);
+              VelocityLoginSupport.teardown(player);
+              this.plugin.releasePlayer(player);
+              connection.close();
+              return null;
+            });
   }
 
   static {
     try {
-      PROFILE_FIELD = MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
-          .findSetter(ConnectedPlayer.class, "profile", GameProfile.class);
+      PROFILE_FIELD =
+          MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
+              .findSetter(ConnectedPlayer.class, "profile", GameProfile.class);
 
       Field defaultPermissionsField = ConnectedPlayer.class.getDeclaredField("DEFAULT_PERMISSIONS");
       defaultPermissionsField.setAccessible(true);
       DEFAULT_PERMISSIONS = (PermissionProvider) defaultPermissionsField.get(null);
 
-      SET_PERMISSION_FUNCTION_METHOD = MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
-          .findVirtual(ConnectedPlayer.class, "setPermissionFunction", MethodType.methodType(void.class, PermissionFunction.class));
+      SET_PERMISSION_FUNCTION_METHOD =
+          MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
+              .findVirtual(
+                  ConnectedPlayer.class,
+                  "setPermissionFunction",
+                  MethodType.methodType(void.class, PermissionFunction.class));
 
       INITIAL_CONNECT_SESSION_HANDLER_CONSTRUCTOR = MethodHandles
           .privateLookupIn(InitialConnectSessionHandler.class, MethodHandles.lookup())
           .findConstructor(InitialConnectSessionHandler.class, MethodType.methodType(void.class, ConnectedPlayer.class, VelocityServer.class));
 
-      CONNECT_TO_INITIAL_SERVER_METHOD = MethodHandles.privateLookupIn(AuthSessionHandler.class, MethodHandles.lookup())
-          .findVirtual(AuthSessionHandler.class, "connectToInitialServer", MethodType.methodType(CompletableFuture.class, ConnectedPlayer.class));
+      CONNECT_TO_INITIAL_SERVER_METHOD =
+          MethodHandles.privateLookupIn(AuthSessionHandler.class, MethodHandles.lookup())
+              .findVirtual(
+                  AuthSessionHandler.class,
+                  "connectToInitialServer",
+                  MethodType.methodType(CompletableFuture.class, ConnectedPlayer.class));
 
       SERVER_ID_HASH_GETTER = MethodHandles.privateLookupIn(AuthSessionHandler.class, MethodHandles.lookup())
           .findGetter(AuthSessionHandler.class, "serverIdHash", String.class);
@@ -315,8 +429,12 @@ public class LoginTasksQueue {
       mcConnectionField.setAccessible(true);
       MC_CONNECTION_SETTER = LambdaUtil.setterOf(mcConnectionField);
 
-      SET_CLIENT_BRAND = MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
-          .findVirtual(ConnectedPlayer.class, "setClientBrand", MethodType.methodType(void.class, String.class));
+      SET_CLIENT_BRAND =
+          MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
+              .findVirtual(
+                  ConnectedPlayer.class,
+                  "setClientBrand",
+                  MethodType.methodType(void.class, String.class));
 
       Field brandChannelField = ClientConfigSessionHandler.class.getDeclaredField("brandChannel");
       brandChannelField.setAccessible(true);

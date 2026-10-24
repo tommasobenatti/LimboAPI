@@ -31,7 +31,6 @@ public class ReloadListener {
 
   @Subscribe
   public void onReload(ProxyReloadEvent event) {
-    this.plugin.reloadPreparedPacketFactory();
     this.plugin.reload();
   }
 }

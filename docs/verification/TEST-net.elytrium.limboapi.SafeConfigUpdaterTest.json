@@ -1,0 +1,52 @@
+{
+  "tests": 11,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "keepsEmptyAndEditedCollectionsIncludingDeletedMapEntries()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "refusesMalformedUtf8WithoutReplacingItWithReplacementCharacters()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "addsSchemaFieldsWithinExistingCollectionEntriesWithoutRestoringDeletedEntries()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "backupFailureCannotReplaceOriginalAndCleansTemporaryFiles()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "extendsInlineSchemaMappingsWithoutReformattingExistingValues()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "createsNewConfigsAndPreservesSymlinks()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "refusesInvalidDuplicateOrWronglyTypedYamlBeforeWriting()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "addsMissingKeysOnDiskWithoutReformattingCustomizationsAndIsIdempotent()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "refusesConcurrentEditsAndRetargetedSymlinks()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "validatesMergedCandidateBeforeTouchingOriginal()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    },
+    {
+      "name": "handlesSharedInsertionOffsetsUnicodeCrLfAndMissingFinalNewlines()",
+      "classname": "net.elytrium.limboapi.SafeConfigUpdaterTest"
+    }
+  ]
+}

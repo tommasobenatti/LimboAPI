@@ -48,7 +48,6 @@ import com.velocitypowered.api.util.UuidUtils;
 import com.velocitypowered.natives.compression.VelocityCompressor;
 import com.velocitypowered.natives.util.Natives;
 import com.velocitypowered.proxy.VelocityServer;
-import com.velocitypowered.proxy.config.PlayerInfoForwarding;
 import com.velocitypowered.proxy.config.VelocityConfiguration;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
 import com.velocitypowered.proxy.connection.client.AuthSessionHandler;
@@ -135,7 +134,8 @@ public class LoginListener {
           try {
             this.hookLoginSession(event);
           } catch (Throwable e) {
-            throw new IllegalStateException("failed to handle login request", e);
+            connection.close();
+            LimboAPI.getLogger().error("Failed to handle login request", e);
           }
         });
         return;
@@ -178,6 +178,7 @@ public class LoginListener {
               ((InboundConnection) inboundConnection).getHandshakeIntent(),
               playerKey
           );
+          VelocityLoginSupport.associateAuthPlayer((AuthSessionHandler) handler, player);
 
           if (connection.getProtocolVersion().noLessThan(ProtocolVersion.MINECRAFT_1_19_3)) {
             TAB_LIST_SETTER.accept(player, new RewritingVelocityTabList(player));
@@ -190,7 +191,7 @@ public class LoginListener {
           if (connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_20_2) >= 0) {
             loginHandler.setPlayer(player);
           }
-          if (this.server.canRegisterConnection(player)) {
+          if (VelocityLoginSupport.canRegister(this.server, player)) {
             if (!connection.isClosed()) {
               // Complete the Login process.
               int threshold = this.server.getConfiguration().getCompressionThreshold();
@@ -224,7 +225,7 @@ public class LoginListener {
 
               VelocityConfiguration configuration = this.server.getConfiguration();
               UUID playerUniqueID = player.getUniqueId();
-              if (configuration.getPlayerInfoForwardingMode() == PlayerInfoForwarding.NONE) {
+              if (VelocityLoginSupport.isForwardingDisabled(configuration)) {
                 playerUniqueID = UuidUtils.generateOfflinePlayerUuid(player.getUsername());
               }
 
@@ -260,10 +261,10 @@ public class LoginListener {
               this.plugin.setInitialID(player, playerUniqueID);
 
               if (connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_20_2) >= 0) {
-                loginHandler.thenRun(() -> this.fireRegisterEvent(player, connection, inbound, handler));
+                loginHandler.thenRun(() -> this.fireRegisterEvent(player, connection, inboundConnection, handler));
               } else {
                 connection.setState(StateRegistry.PLAY);
-                this.fireRegisterEvent(player, connection, inbound, handler);
+                this.fireRegisterEvent(player, connection, inboundConnection, handler);
               }
             }
           } else {
@@ -278,14 +279,22 @@ public class LoginListener {
   }
 
   private void fireRegisterEvent(ConnectedPlayer player, MinecraftConnection connection,
-      InitialInboundConnection inbound, Object handler) {
+      InboundConnection inbound, Object handler) {
     this.server.getEventManager().fire(new LoginLimboRegisterEvent(player)).thenAcceptAsync(limboRegisterEvent -> {
+      if (connection.isClosed()) {
+        this.plugin.removeInitialID(player);
+        return;
+      }
       LoginTasksQueue queue = new LoginTasksQueue(this.plugin, handler, this.server, player, inbound, limboRegisterEvent.getOnJoinCallbacks());
       this.plugin.addLoginQueue(player, queue);
       this.plugin.setKickCallback(player, limboRegisterEvent.getOnKickCallback());
       queue.next();
     }, connection.eventLoop()).exceptionally(t -> {
       LimboAPI.getLogger().error("Exception while registering LimboAPI login handlers for {}.", player, t);
+      this.plugin.removeLoginQueue(player);
+      this.plugin.removeKickCallback(player);
+      this.plugin.removeInitialID(player);
+      connection.close();
       return null;
     });
   }
