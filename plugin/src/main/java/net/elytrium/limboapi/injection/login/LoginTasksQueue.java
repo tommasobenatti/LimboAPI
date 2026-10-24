@@ -290,6 +290,16 @@ public class LoginTasksQueue {
                         if (reason.isPresent()) {
                           this.player.disconnect0(reason.get(), false);
                         } else {
+                          if (!VelocityLoginSupport.acceptLogin(this.server, this.player)) {
+                            this.plugin.releasePlayer(this.player);
+                            VelocityLoginSupport.teardown(this.player);
+                            if (!connection.isClosed()) {
+                              this.player.disconnect0(
+                                  Component.translatable("velocity.error.already-connected-proxy"),
+                                  false);
+                            }
+                            return;
+                          }
                           if (connection.getActiveSessionHandler()
                               instanceof LoginConfirmHandler confirm) {
                             confirm.waitForConfirmation(

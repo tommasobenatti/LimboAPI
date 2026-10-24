@@ -1,0 +1,36 @@
+{
+  "tests": 7,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "normalNativeConnectionsNeedNoLimboWork()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "failedPreparationCompletesAsNativeCancellation()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "otherPluginsDeniedResultIsPreserved()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "incompleteLoginQueueCannotBeBypassed()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "actualCtdEventPipelineWaitsForTheSameNativeRequest()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "actualCtdPipelineHonorsAuthenticationAndPackDenialsBeforeHandoff()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    },
+    {
+      "name": "holdsTheOriginalNativeEventUntilConfigAckAndNeverCreatesSecondRequest()",
+      "classname": "net.elytrium.limboapi.injection.server.ServerConnectListenerTest"
+    }
+  ]
+}

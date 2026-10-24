@@ -312,14 +312,24 @@ public class LoginListener {
     connection.eventLoop().execute(() -> {
       if (!(connection.getActiveSessionHandler() instanceof ClientPlaySessionHandler)) {
         try {
-          ClientPlaySessionHandler playHandler = new ClientPlaySessionHandler(this.server, player);
-          SPAWNED_FIELD.invokeExact(playHandler, this.plugin.isLimboJoined(player));
+          ClientPlaySessionHandler playHandler = createPlaySessionHandler(this.server, player, this.plugin.isLimboJoined(player));
           connection.setActiveSessionHandler(connection.getState(), playHandler);
         } catch (Throwable e) {
           throw new ReflectionException(e);
         }
       }
     });
+  }
+
+  public static ClientPlaySessionHandler createPlaySessionHandler(VelocityServer server, ConnectedPlayer player,
+      boolean spawned) {
+    try {
+      ClientPlaySessionHandler handler = new ClientPlaySessionHandler(server, player);
+      SPAWNED_FIELD.invokeExact(handler, spawned);
+      return handler;
+    } catch (Throwable throwable) {
+      throw new ReflectionException(throwable);
+    }
   }
 
   static {

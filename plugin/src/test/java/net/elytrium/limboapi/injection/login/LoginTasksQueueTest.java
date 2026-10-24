@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.velocityctd.proxy.cluster.VelocityClusterPlayerService;
 import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.permission.PermissionsSetupEvent;
 import com.velocitypowered.api.network.ProtocolVersion;
@@ -64,6 +66,7 @@ class LoginTasksQueueTest {
   private final ConnectedPlayer player = mock(ConnectedPlayer.class);
   private final MinecraftConnection connection = mock(MinecraftConnection.class);
   private final VelocityEventManager eventManager = mock(VelocityEventManager.class);
+  private final VelocityClusterPlayerService cluster = mock(VelocityClusterPlayerService.class);
   private final LoginConfirmHandler confirmation = mock(LoginConfirmHandler.class);
   private final EmbeddedChannel channel = new EmbeddedChannel();
   private final CompletableFuture<Boolean> registration = new CompletableFuture<>();
@@ -75,6 +78,8 @@ class LoginTasksQueueTest {
     this.staticPlugin = mockStatic(LimboAPI.class);
     this.staticPlugin.when(LimboAPI::getLogger).thenReturn(mock(Logger.class));
     when(this.server.getEventManager()).thenReturn(this.eventManager);
+    when(this.server.getClusterPlayerService()).thenReturn(this.cluster);
+    when(this.cluster.onPlayerConnect(this.player)).thenReturn(true);
     when(this.player.getConnection()).thenReturn(this.connection);
     when(this.connection.getChannel()).thenReturn(this.channel);
     when(this.connection.eventLoop()).thenReturn(this.channel.eventLoop());
@@ -179,6 +184,7 @@ class LoginTasksQueueTest {
     Method method = VelocityLoginSupport.class.getMethod("finalizeLogin", VelocityServer.class, ConnectedPlayer.class);
     method.invoke(null, this.server, this.player);
     verify(registry).finalizeLogin(this.player);
+    verify(this.player, never()).fullyConnected();
   }
 
   @Test
@@ -197,6 +203,28 @@ class LoginTasksQueueTest {
     this.queue.next();
     this.channel.runPendingTasks();
     verify(this.connection).close();
+    verify(this.plugin).releasePlayer(this.player);
+  }
+
+  @Test
+  void clusterAdmissionPrecedesFullyConnectedAndBackendHandoff() throws Exception {
+    this.initialize();
+    this.registration.complete(true);
+    this.channel.runPendingTasks();
+    var order = inOrder(this.cluster, this.player, this.confirmation);
+    order.verify(this.cluster).onPlayerConnect(this.player);
+    order.verify(this.player).fullyConnected();
+    order.verify(this.confirmation).waitForConfirmation(any());
+  }
+
+  @Test
+  void clusterDuplicateRejectionCannotConnectOrPublishOnline() throws Exception {
+    when(this.cluster.onPlayerConnect(this.player)).thenReturn(false);
+    this.initialize();
+    this.registration.complete(true);
+    this.channel.runPendingTasks();
+    verify(this.confirmation, never()).waitForConfirmation(any());
+    verify(this.player, never()).fullyConnected();
     verify(this.plugin).releasePlayer(this.player);
   }
 }

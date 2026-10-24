@@ -4,14 +4,16 @@
 
 ## MCExp / Velocity-CTD 410 fork
 
-This fork targets **Velocity-CTD 4.3.1-SNAPSHOT build 410** and **Java 25+**.
+This fork targets **Velocity-CTD 4.3.1-SNAPSHOT builds 410/411** and **Java 25+**.
 Install the paired MCExp builds of [LimboAPI](https://github.com/tommasobenatti/LimboAPI/releases)
 and [LimboReconnect](https://github.com/tommasobenatti/LimboReconnect/releases).
 Keep existing configuration folders; replace both jars with the proxy stopped.
+Native CTD queue handoffs are supported by the paired `.1` release: players remain in limbo
+while the native queue owns priority, capacity and retry policy. [Queue integration](docs/ctd-native-queue.tdd.md).
 These binaries are specific to CTD and are not advertised as drop-in upstream Velocity builds.
 
 The CTD login lifecycle, nLogin profile events, ForcePack resource-pack responses,
-event futures and session cleanup are adapted and covered by 51 regression tests.
+event futures and session cleanup are adapted and covered by 72 regression tests.
 
 The paired build passed an isolated test with actual ForcePack 1.3.75-SNAPSHOT and
 nLogin 2.0.18, including a 36-second CONFIG connection and two reloads of each plugin.

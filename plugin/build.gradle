@@ -19,6 +19,7 @@ compileJava() {
 
 dependencies() {
   compileOnly("org.checkerframework:checker-qual:4.2.3")
+  compileOnly("org.jetbrains:annotations:26.0.2")
   implementation(project(":api"))
   implementation(libs.elytrium.commons.config)
   implementation(libs.elytrium.commons.utils)

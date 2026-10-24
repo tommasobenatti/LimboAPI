@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.27-MCExp-CTD410.1 — 2026-10-24
+
+- Bridge authenticated native server requests out of limbo without creating a second connection.
+- Wait for CONFIG acknowledgement and preserve spawned state for legacy clients.
+- Expose a default prepared-handler ownership query for scheduler retry recovery.
+- Honor CTD cluster admission, fully-connected queue hooks and final login lock lifecycle.
+- Close or cancel stale handoffs safely; protect login events and other plugins' replacement handlers.
+- Prevent a delayed original CONFIG restore from overwriting the next native handoff.
+- Verify 72 API regression tests and the paired native queue tests on CTD410 and411.
+
+
 ## 1.1.27-MCExp-CTD410 — 2026-10-24
 
 - Adapt asynchronous registration and the CTD identity-lock lifecycle, forwarding type and legacy tablists.

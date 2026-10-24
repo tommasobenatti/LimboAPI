@@ -39,6 +39,11 @@ public final class VelocityLoginSupport {
   private static final MethodHandle REGISTRY;
   private static final MethodHandle FINALIZE_LOGIN;
   private static final MethodHandle AUTH_PLAYER;
+  private static final MethodHandle LOGIN_COMPLETED;
+  private static final MethodHandle FULLY_CONNECTED;
+  private static final MethodHandle IS_FULLY_CONNECTED;
+  private static final MethodHandle CLUSTER;
+  private static final MethodHandle CLUSTER_ADMISSION;
 
   private VelocityLoginSupport() {
   }
@@ -104,6 +109,34 @@ public final class VelocityLoginSupport {
     }
   }
 
+  public static boolean hasCompletedLogin(ConnectedPlayer player) {
+    try {
+      return LOGIN_COMPLETED != null && (boolean) LOGIN_COMPLETED.invokeExact(player);
+    } catch (Throwable throwable) {
+      throw new ReflectionException(throwable);
+    }
+  }
+
+  /** Honors CTD's cross-proxy duplicate policy before publishing native queue presence. */
+  public static boolean acceptLogin(VelocityServer server, ConnectedPlayer player) {
+    try {
+      if (IS_FULLY_CONNECTED == null || CLUSTER_ADMISSION == null) {
+        throw new IllegalStateException("Unsupported CTD cluster admission contract");
+      }
+      if ((boolean) IS_FULLY_CONNECTED.invokeExact(player)) {
+        return true;
+      }
+      Object cluster = CLUSTER.invokeExact(server);
+      if (!(boolean) CLUSTER_ADMISSION.invokeExact(cluster, player)) {
+        return false;
+      }
+      FULLY_CONNECTED.invokeExact(player);
+      return true;
+    } catch (Throwable throwable) {
+      throw new ReflectionException(throwable);
+    }
+  }
+
   static {
     try {
       MethodHandles.Lookup lookup = MethodHandles.publicLookup();
@@ -125,6 +158,11 @@ public final class VelocityLoginSupport {
       MethodHandle registry;
       MethodHandle finish;
       MethodHandle authPlayer;
+      MethodHandle completed;
+      MethodHandle fullyConnected;
+      MethodHandle isFullyConnected;
+      MethodHandle cluster;
+      MethodHandle admission;
       try {
         mark = MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
             .findVirtual(ConnectedPlayer.class, "markLoginEventFired", MethodType.methodType(void.class));
@@ -132,10 +170,23 @@ public final class VelocityLoginSupport {
         registry = lookup.unreflect(getter).asType(MethodType.methodType(Object.class, VelocityServer.class));
         finish = lookup.unreflect(getter.getReturnType().getMethod("finalizeLogin", ConnectedPlayer.class))
             .asType(MethodType.methodType(void.class, Object.class, ConnectedPlayer.class));
+        completed = MethodHandles.privateLookupIn(ConnectedPlayer.class, MethodHandles.lookup())
+            .findVirtual(ConnectedPlayer.class, "isLoginCompleted", MethodType.methodType(boolean.class));
+        fullyConnected = lookup.findVirtual(ConnectedPlayer.class, "fullyConnected", MethodType.methodType(void.class));
+        isFullyConnected = lookup.findVirtual(ConnectedPlayer.class, "isFullyConnected", MethodType.methodType(boolean.class));
+        java.lang.reflect.Method clusterGetter = VelocityServer.class.getMethod("getClusterPlayerService");
+        cluster = lookup.unreflect(clusterGetter).asType(MethodType.methodType(Object.class, VelocityServer.class));
+        admission = lookup.unreflect(clusterGetter.getReturnType().getMethod("onPlayerConnect", ConnectedPlayer.class))
+            .asType(MethodType.methodType(boolean.class, Object.class, ConnectedPlayer.class));
       } catch (NoSuchMethodException ignored) {
         mark = null;
         registry = null;
         finish = null;
+        completed = null;
+        fullyConnected = null;
+        isFullyConnected = null;
+        cluster = null;
+        admission = null;
       }
       try {
         authPlayer = MethodHandles.privateLookupIn(AuthSessionHandler.class, MethodHandles.lookup())
@@ -147,6 +198,11 @@ public final class VelocityLoginSupport {
       REGISTRY = registry;
       FINALIZE_LOGIN = finish;
       AUTH_PLAYER = authPlayer;
+      LOGIN_COMPLETED = completed;
+      FULLY_CONNECTED = fullyConnected;
+      IS_FULLY_CONNECTED = isFullyConnected;
+      CLUSTER = cluster;
+      CLUSTER_ADMISSION = admission;
     } catch (ReflectiveOperationException exception) {
       throw new ReflectionException(exception);
     }

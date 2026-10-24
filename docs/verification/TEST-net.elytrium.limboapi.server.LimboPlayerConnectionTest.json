@@ -1,0 +1,52 @@
+{
+  "tests": 11,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "failureOwnershipIsCheckedOnEventLoop()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "absentLoginQueueDoesNotMeanLoginEventsAreComplete()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "coalescesConcurrentPreparationAndDetectsOtherHandlers()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "oldDirectRequestCannotEjectReplacementHandler()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "legacyPreparedHandlerRemembersAlreadySpawnedWorld()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "doesNotTransferBeforeAuthenticationFinishes()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "closingChannelFinishesPendingHandoff()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "waitsForConfigAckWithoutOpeningAnotherConnection()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "cancellationWhileWaitingForPlayConfirmationFinishesOwnedTransition()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "directApiCannotBypassPendingLoginEvents()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    },
+    {
+      "name": "cancelledTransitionDoesNotLeaveReleasedLimboOpen()",
+      "classname": "net.elytrium.limboapi.server.LimboPlayerConnectionTest"
+    }
+  ]
+}

@@ -21,18 +21,23 @@ import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
+import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.connection.client.ClientConfigSessionHandler;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.protocol.StateRegistry;
 import com.velocitypowered.proxy.protocol.packet.LegacyPlayerListItemPacket;
 import com.velocitypowered.proxy.protocol.packet.UpsertPlayerInfoPacket;
+import io.netty.channel.ChannelFutureListener;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import net.elytrium.limboapi.LimboAPI;
 import net.elytrium.limboapi.api.Limbo;
 import net.elytrium.limboapi.api.material.Item;
@@ -43,7 +48,9 @@ import net.elytrium.limboapi.api.protocol.item.ItemComponentMap;
 import net.elytrium.limboapi.api.protocol.packets.data.AbilityFlags;
 import net.elytrium.limboapi.api.protocol.packets.data.MapData;
 import net.elytrium.limboapi.api.protocol.packets.data.MapPalette;
+import net.elytrium.limboapi.injection.login.LoginListener;
 import net.elytrium.limboapi.injection.login.LoginTasksQueue;
+import net.elytrium.limboapi.injection.login.VelocityLoginSupport;
 import net.elytrium.limboapi.protocol.packets.s2c.ChangeGameStatePacket;
 import net.elytrium.limboapi.protocol.packets.s2c.MapDataPacket;
 import net.elytrium.limboapi.protocol.packets.s2c.PlayerAbilitiesPacket;
@@ -64,6 +71,10 @@ public class LimboPlayerImpl implements LimboPlayer {
   private final ProtocolVersion version;
 
   private GameMode gameMode = GameMode.ADVENTURE;
+  private CompletableFuture<Void> connectionPreparation;
+  private boolean preparingConnection;
+  private boolean handoffRequested;
+  private MinecraftSessionHandler preparedConnectionHandler;
 
   public LimboPlayerImpl(LimboAPI plugin, LimboImpl server, ConnectedPlayer player) {
     this.plugin = plugin;
@@ -124,8 +135,14 @@ public class LimboPlayerImpl implements LimboPlayer {
   public void sendImage(int mapID, BufferedImage image, boolean sendItem, boolean resize) {
     if (sendItem) {
       if (this.version.noLessThan(ProtocolVersion.MINECRAFT_1_20_5)) {
-        this.setInventory(36, SimpleItem.fromItem(Item.FILLED_MAP), 1, mapID,
-            this.plugin.createItemComponentMap().add(ProtocolVersion.MINECRAFT_1_20_5, "minecraft:map_id", mapID));
+        this.setInventory(
+            36,
+            SimpleItem.fromItem(Item.FILLED_MAP),
+            1,
+            mapID,
+            this.plugin
+                .createItemComponentMap()
+                .add(ProtocolVersion.MINECRAFT_1_20_5, "minecraft:map_id", mapID));
       } else if (this.version.noLessThan(ProtocolVersion.MINECRAFT_1_17)) {
         this.setInventory(36, SimpleItem.fromItem(Item.FILLED_MAP), 1, mapID,
             CompoundBinaryTag.builder().put("map", IntBinaryTag.intBinaryTag(mapID)).build());
@@ -145,9 +162,12 @@ public class LimboPlayerImpl implements LimboPlayer {
         image = resizedImage;
       } else {
         throw new IllegalStateException(
-            "You either need to provide an image of " + MapData.MAP_DIM_SIZE + "x" + MapData.MAP_DIM_SIZE
-                + " pixels or set the resize parameter to true so that API will automatically resize your image."
-        );
+            "You either need to provide an image of "
+                + MapData.MAP_DIM_SIZE
+                + "x"
+                + MapData.MAP_DIM_SIZE
+                + " pixels or set the resize parameter to true so that API will automatically"
+                + " resize your image.");
       }
     }
 
@@ -241,51 +261,75 @@ public class LimboPlayerImpl implements LimboPlayer {
 
   @Override
   public void disconnect() {
-    this.connection.eventLoop().execute(() -> {
-      if (this.connection.getActiveSessionHandler() == this.sessionHandler) {
-        this.sessionHandler.disconnect(() -> {
-          if (this.plugin.hasLoginQueue(this.player)) {
-            if (this.connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_20_2) >= 0) {
-              this.sessionHandler.disconnectToConfig(() -> this.plugin.getLoginQueue(this.player).next());
-            } else {
-              this.sessionHandler.disconnected();
-              this.plugin.getLoginQueue(this.player).next();
-            }
-          } else {
-            RegisteredServer server = this.sessionHandler.getPreviousServer();
-            if (server != null) {
-              this.sendToRegisteredServer(server);
-            } else {
-              this.sessionHandler.disconnected();
-            }
-          }
-        });
-      }
-    });
+    this.connection
+        .eventLoop()
+        .execute(
+            () -> {
+              if (!this.plugin.hasLoginQueue(this.player)
+                  && !VelocityLoginSupport.hasCompletedLogin(this.player)) {
+                return;
+              }
+              if (this.connection.getActiveSessionHandler() == this.sessionHandler) {
+                this.sessionHandler.disconnect(
+                    () -> {
+                      if (this.plugin.hasLoginQueue(this.player)) {
+                        if (this.connection
+                                .getProtocolVersion()
+                                .compareTo(ProtocolVersion.MINECRAFT_1_20_2)
+                            >= 0) {
+                          this.sessionHandler.disconnectToConfig(
+                              () -> this.plugin.getLoginQueue(this.player).next());
+                        } else {
+                          this.sessionHandler.disconnected();
+                          this.plugin.getLoginQueue(this.player).next();
+                        }
+                      } else {
+                        RegisteredServer server = this.sessionHandler.getPreviousServer();
+                        if (server != null) {
+                          this.sendToRegisteredServer(server);
+                        } else {
+                          this.sessionHandler.disconnected();
+                        }
+                      }
+                    });
+              }
+            });
   }
 
   @Override
   public void disconnect(RegisteredServer server) {
-    this.connection.eventLoop().execute(() -> {
-      if (this.connection.getActiveSessionHandler() == this.sessionHandler) {
-        this.sessionHandler.disconnect(() -> {
-          if (this.plugin.hasLoginQueue(this.player)) {
-            if (this.connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_20_2) >= 0) {
-              this.sessionHandler.disconnectToConfig(() -> {
-                this.plugin.setNextServer(this.player, server);
-                this.plugin.getLoginQueue(this.player).next();
-              });
-            } else {
-              this.sessionHandler.disconnected();
-              this.plugin.setNextServer(this.player, server);
-              this.plugin.getLoginQueue(this.player).next();
-            }
-          } else {
-            this.sendToRegisteredServer(server);
-          }
-        });
-      }
-    });
+    this.connection
+        .eventLoop()
+        .execute(
+            () -> {
+              if (!this.plugin.hasLoginQueue(this.player)
+                  && !VelocityLoginSupport.hasCompletedLogin(this.player)) {
+                return;
+              }
+              if (this.connection.getActiveSessionHandler() == this.sessionHandler) {
+                this.sessionHandler.disconnect(
+                    () -> {
+                      if (this.plugin.hasLoginQueue(this.player)) {
+                        if (this.connection
+                                .getProtocolVersion()
+                                .compareTo(ProtocolVersion.MINECRAFT_1_20_2)
+                            >= 0) {
+                          this.sessionHandler.disconnectToConfig(
+                              () -> {
+                                this.plugin.setNextServer(this.player, server);
+                                this.plugin.getLoginQueue(this.player).next();
+                              });
+                        } else {
+                          this.sessionHandler.disconnected();
+                          this.plugin.setNextServer(this.player, server);
+                          this.plugin.getLoginQueue(this.player).next();
+                        }
+                      } else {
+                        this.sendToRegisteredServer(server);
+                      }
+                    });
+              }
+            });
   }
 
   private void deject() {
@@ -294,28 +338,154 @@ public class LimboPlayerImpl implements LimboPlayer {
   }
 
   private void sendToRegisteredServer(RegisteredServer server) {
-    this.deject();
-    this.connection.setState(StateRegistry.PLAY);
+    this.prepareConnectionHandler()
+        .thenRunAsync(
+            () -> {
+              if (this.isServerConnectionPrepared()) {
+                this.player.createConnectionRequest(server).fireAndForget();
+              }
+            },
+            this.connection.eventLoop());
+  }
 
-    if (this.connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_20_2) >= 0) {
-      this.sessionHandler.disconnectToConfig(() -> {
-        // Rollback original CONFIG handler
-        ClientConfigSessionHandler handler = new ClientConfigSessionHandler(this.plugin.getServer(), this.player);
-        LoginTasksQueue.BRAND_CHANNEL_SETTER.accept(handler, "minecraft:brand");
-        this.connection.setActiveSessionHandler(StateRegistry.CONFIG, handler);
-        this.player.createConnectionRequest(server).fireAndForget();
-      });
-    } else {
-      if (this.connection.getProtocolVersion().compareTo(ProtocolVersion.MINECRAFT_1_19_1) <= 0) {
-        this.connection.delayedWrite(new LegacyPlayerListItemPacket(
-            LegacyPlayerListItemPacket.REMOVE_PLAYER,
-            List.of(new LegacyPlayerListItemPacket.Item(this.plugin.getInitialID(this.player)))
-        ));
-      }
-
-      this.sessionHandler.disconnected();
-      this.player.createConnectionRequest(server).fireAndForget();
+  /** Prepares an externally initiated connection without creating another connection request. */
+  public synchronized CompletableFuture<Void> prepareForServerConnection() {
+    if (this.connectionPreparation != null) {
+      return this.connectionPreparation;
     }
+    CompletableFuture<Void> ready = this.newConnectionPreparation();
+    try {
+      this.connection
+          .eventLoop()
+          .execute(
+              () -> {
+                if (ready.isDone()) {
+                  return;
+                }
+                if (this.plugin.hasLoginQueue(this.player)
+                    || !VelocityLoginSupport.hasCompletedLogin(this.player)
+                    || this.connection.getActiveSessionHandler() != this.sessionHandler) {
+                  ready.completeExceptionally(
+                      new CancellationException(
+                          "The limbo no longer owns an authenticated connection"));
+                  return;
+                }
+                try {
+                  this.handoffRequested = true;
+                  this.sessionHandler.disconnect(this::prepareConnectionHandler);
+                } catch (Throwable throwable) {
+                  ready.completeExceptionally(throwable);
+                }
+              });
+    } catch (RuntimeException exception) {
+      ready.completeExceptionally(exception);
+    }
+    return ready;
+  }
+
+  private synchronized CompletableFuture<Void> newConnectionPreparation() {
+    if (this.connectionPreparation != null) {
+      return this.connectionPreparation;
+    }
+    CompletableFuture<Void> ready = new CompletableFuture<>();
+    this.connectionPreparation = ready;
+    ChannelFutureListener closed =
+        future -> ready.completeExceptionally(new CancellationException("Connection closed"));
+    this.connection.getChannel().closeFuture().addListener(closed);
+    long timeout = Math.max(1000L, this.plugin.getServer().getConfiguration().getReadTimeout());
+    ready
+        .orTimeout(timeout, TimeUnit.MILLISECONDS)
+        .whenComplete(
+            (unused, throwable) -> {
+              this.connection.getChannel().closeFuture().removeListener(closed);
+              if (throwable != null) {
+                try {
+                  this.connection
+                      .eventLoop()
+                      .execute(
+                          () -> {
+                            MinecraftSessionHandler active =
+                                this.connection.getActiveSessionHandler();
+                            if (this.handoffRequested
+                                && (active == this.sessionHandler
+                                    || active == this.preparedConnectionHandler)) {
+                              this.connection.close();
+                            }
+                          });
+                } catch (RuntimeException exception) {
+                  this.connection.getChannel().close();
+                }
+              }
+            });
+    return ready;
+  }
+
+  private CompletableFuture<Void> prepareConnectionHandler() {
+    CompletableFuture<Void> ready = this.newConnectionPreparation();
+    if (this.preparingConnection || ready.isDone()) {
+      return ready;
+    }
+    if (!VelocityLoginSupport.hasCompletedLogin(this.player)) {
+      ready.completeExceptionally(new CancellationException("Login events have not completed"));
+      return ready;
+    }
+    this.handoffRequested = true;
+    this.preparingConnection = true;
+    try {
+      this.deject();
+      this.connection.setState(StateRegistry.PLAY);
+      if (this.version.noLessThan(ProtocolVersion.MINECRAFT_1_20_2)) {
+        this.sessionHandler.disconnectToConfig(
+            () -> {
+              if (ready.isDone()) {
+                return;
+              }
+              if (this.connection.getActiveSessionHandler() != this.sessionHandler
+                  || this.connection.isClosed()) {
+                ready.completeExceptionally(
+                    new CancellationException("Connection ownership changed"));
+                return;
+              }
+              try {
+                ClientConfigSessionHandler handler =
+                    new ClientConfigSessionHandler(this.plugin.getServer(), this.player);
+                LoginTasksQueue.BRAND_CHANNEL_SETTER.accept(handler, "minecraft:brand");
+                if (this.sessionHandler.getSettings() != null) {
+                  this.player.setClientSettings(this.sessionHandler.getSettings());
+                }
+                this.preparedConnectionHandler = handler;
+                this.connection.setActiveSessionHandler(StateRegistry.CONFIG, handler);
+                ready.complete(null);
+              } catch (Throwable throwable) {
+                ready.completeExceptionally(throwable);
+              }
+            });
+      } else {
+        if (this.version.noGreaterThan(ProtocolVersion.MINECRAFT_1_19_1)) {
+          this.connection.delayedWrite(
+              new LegacyPlayerListItemPacket(
+                  LegacyPlayerListItemPacket.REMOVE_PLAYER,
+                  List.of(
+                      new LegacyPlayerListItemPacket.Item(this.plugin.getInitialID(this.player)))));
+        }
+        this.sessionHandler.disconnected();
+        this.preparedConnectionHandler =
+            LoginListener.createPlaySessionHandler(
+                this.plugin.getServer(), this.player, this.plugin.isLimboJoined(this.player));
+        this.connection.setActiveSessionHandler(StateRegistry.PLAY, this.preparedConnectionHandler);
+        ready.complete(null);
+      }
+    } catch (Throwable throwable) {
+      ready.completeExceptionally(throwable);
+    }
+    return ready;
+  }
+
+  @Override
+  public boolean isServerConnectionPrepared() {
+    return this.preparedConnectionHandler != null
+        && !this.connection.isClosed()
+        && this.connection.getActiveSessionHandler() == this.preparedConnectionHandler;
   }
 
   @Override
@@ -336,7 +506,8 @@ public class LimboPlayerImpl implements LimboPlayer {
   @Override
   public byte getAbilities() {
     return switch (this.gameMode) {
-      case CREATIVE -> AbilityFlags.ALLOW_FLYING | AbilityFlags.CREATIVE_MODE | AbilityFlags.INVULNERABLE;
+      case CREATIVE ->
+          AbilityFlags.ALLOW_FLYING | AbilityFlags.CREATIVE_MODE | AbilityFlags.INVULNERABLE;
       case SPECTATOR -> AbilityFlags.ALLOW_FLYING | AbilityFlags.INVULNERABLE | AbilityFlags.FLYING;
       default -> 0;
     };

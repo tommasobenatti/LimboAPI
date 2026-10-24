@@ -3,9 +3,9 @@
 ## Supported target
 
 - Java 25 or later; build with JDK 25.
-- Velocity-CTD 4.3.1-SNAPSHOT build 410. The CTD tree at
+- Velocity-CTD 4.3.1-SNAPSHOT builds410 and411 verified. The baseline CTD tree at
   `cf46d4000d252124c280f6361166df57f3d0f7f3` matched build 410 when verified on 24 October 2026.
-- Use the paired MCExp LimboAPI 1.1.27-MCExp-CTD410 and LimboReconnect 1.1.7-MCExp-CTD410.
+- Use the paired MCExp LimboAPI 1.1.27-MCExp-CTD410.1 and LimboReconnect 1.1.7-MCExp-CTD410.
 - Actual integration inputs: ForcePack 1.3.75-SNAPSHOT and nLogin 2.0.18.
 
 Changes address the reported removed-method login error and concrete event/session
@@ -65,8 +65,8 @@ not the verified CTD path. No Velocity or test classes are bundled. SnakeYAML 2.
 
 ## Validation and limitations
 
-51 focused tests pass, with zero skipped/failed tests. Compilation, Checkstyle,
-SpotBugs and license tasks pass. The pair totals 85 tests. Whole-project coverage was
+72 focused tests pass, with zero skipped/failed tests. Compilation, Checkstyle,
+SpotBugs and license tasks pass. The paired `.1` build totals 143 tests. Whole-project coverage was
 not measured and the audit was scoped to login, resource packs, reconnect and resource lifecycle.
 
 The isolated smoke used real CTD/ForcePack/nLogin jars, offline protocol 765,
@@ -113,3 +113,39 @@ Expected: three complete login/CONFIG attempts, first same-socket hold at least3
 ForcePack SUCCESSFUL, both reload counters2, unchanged config hashes, nLogin profile
 hook active, no binary/ERROR messages and graceful proxy exit0. The fixture uses only
 fresh test defaults, an empty local pack and a synthetic backend; it never loads production data.
+
+
+## Native queue integration (.1)
+
+Pair this API with LimboReconnect1.1.7-MCExp-CTD410.1. Its new setting
+`integrate-ctd-queue: true` is added conservatively to existing config.yml files.
+CTD must also have its native queue enabled in velocity.toml; no server files are
+changed by this source update.
+
+On a matching restart kick, Reconnect sends the player to limbo and enrolls once
+through CTD's public QueueManager. CTD owns queue ordering, priority, warmup, capacity,
+paused states and Redis behavior. Existing entries and timestamps are preserved.
+Native `/leavequeue` and configured server command aliases are forwarded through
+Velocity's permission-aware CommandManager; login/auth/admin commands are not exposed.
+Viewing the server list does not cancel pending admission. Leaving a queue does not
+cause automatic re-enrollment.
+
+When CTD selects the player, the API delays the original ServerPreConnectEvent until
+limbo has completed its CONFIG transition (legacy clients get a native PLAY handler
+with their spawned state preserved). It resumes that same connection request; no
+second request is created. A bounded preparation and ownership guard handle closed,
+cancelled or replaced sessions. Reconnect recovers a failed native handoff only while
+it still owns the specifically prepared handler and no other connection/fallback won.
+It does not recreate queue entries removed by CTD, the user, bans or retry exhaustion.
+
+Queue disabled, excluded/inactive destination, bypass permission or integration off
+uses standalone reconnect. PAUSED does not silently direct-connect. Reloads refresh
+native manager snapshots; removing a target terminates cleanly instead of pinging a
+stale backend. Queue-on-shutdown controls CTD's fallback policy independently of this
+explicit plugin reconnect feature. Native banned-reason policy remains authoritative.
+
+See [queue test evidence](ctd-native-queue.tdd.md). Local tests cover the native queue,
+entry and event-manager code from official CTD410/411; a real multi-proxy Redis setup
+and an in-game PLAY backend restart remain staging checks. The earlier successful
+nLogin2.0.18 smoke and the later license-unlinked refusal are historical validation
+boundaries, not a claim that current premium authentication was retested.

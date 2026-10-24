@@ -94,6 +94,7 @@ import net.elytrium.limboapi.injection.packet.MinecraftLimitedCompressDecoder;
 import net.elytrium.limboapi.injection.packet.PreparedPacketImpl;
 import net.elytrium.limboapi.injection.packet.RemovePlayerInfoHook;
 import net.elytrium.limboapi.injection.packet.UpsertPlayerInfoHook;
+import net.elytrium.limboapi.injection.server.ServerConnectListener;
 import net.elytrium.limboapi.material.Biome;
 import net.elytrium.limboapi.protocol.LimboProtocol;
 import net.elytrium.limboapi.protocol.packets.PacketFactoryImpl;
@@ -337,6 +338,7 @@ public class LimboAPI implements LimboFactory {
       eventManager.register(this, this.loginListener);
       eventManager.register(this, this.eventManagerHook);
       eventManager.register(this, new DisconnectListener(this));
+      eventManager.register(this, new ServerConnectListener(this));
       eventManager.register(this, new ReloadListener(this));
     }
     try {

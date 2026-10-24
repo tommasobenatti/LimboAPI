@@ -1,5 +1,5 @@
 {
-  "tests": 7,
+  "tests": 8,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
@@ -22,6 +22,10 @@
     },
     {
       "name": "limitsBurstsWithoutAccumulatingBytesForTheWholeSession()",
+      "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
+    },
+    {
+      "name": "queuedOriginalHandlerRestoreCannotOverwriteNewNativeHandoff()",
       "classname": "net.elytrium.limboapi.server.LimboSessionHandlerImplTest"
     },
     {

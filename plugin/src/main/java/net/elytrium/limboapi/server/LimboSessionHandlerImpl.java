@@ -513,6 +513,9 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
         && !(this.originalHandler instanceof ClientPlaySessionHandler) // cause issues with server switching
         && !(this.originalHandler instanceof LoginConfirmHandler)) {
       connection.eventLoop().execute(() -> {
+        if (connection.getActiveSessionHandler() != this) {
+          return;
+        }
         // Ensure that originalHandler is returned to the proper state
         if (connection.getState() != this.originalState) {
           connection.addSessionHandler(this.originalState, this.originalHandler);
@@ -544,6 +547,10 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
 
   public RegisteredServer getPreviousServer() {
     return this.previousServer;
+  }
+
+  public LimboPlayer getLimboPlayer() {
+    return this.limboPlayer;
   }
 
   public int getPing() {

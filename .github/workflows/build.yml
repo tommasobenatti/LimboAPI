@@ -16,6 +16,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      matrix:
+        ctd: [410, 411]
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.2
@@ -24,10 +27,17 @@ jobs:
         with:
           distribution: temurin
           java-version: 25
-      - name: Download verified Velocity-CTD 410
+      - name: Download verified Velocity-CTD
+        env:
+          CTD_BUILD: ${{ matrix.ctd }}
         run: |
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/velocity-ctd.jar" https://github.com/GemstoneGG/Velocity-CTD/releases/download/build-410/velocity-ctd-fatjar-4.3.1-SNAPSHOT-410.jar
-          echo "7ec86cab7c4187e84ff0312ef2459bd70f96c5484552142b79b82d7c9d25a05d  $RUNNER_TEMP/velocity-ctd.jar" | sha256sum --check
+          case "$CTD_BUILD" in
+            410) checksum=7ec86cab7c4187e84ff0312ef2459bd70f96c5484552142b79b82d7c9d25a05d ;;
+            411) checksum=c772d49f3b4d77244ffa028603380d327d6b992e5867c57bde9492da5d1c3f25 ;;
+            *) exit 1 ;;
+          esac
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/velocity-ctd.jar" "https://github.com/GemstoneGG/Velocity-CTD/releases/download/build-$CTD_BUILD/velocity-ctd-fatjar-4.3.1-SNAPSHOT-$CTD_BUILD.jar"
+          echo "$checksum  $RUNNER_TEMP/velocity-ctd.jar" | sha256sum --check
       - name: Download verified upstream mappings
         run: |
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/limboapi-mappings.jar" https://github.com/Elytrium/LimboAPI/releases/download/dev-build/limboapi-1.1.27-SNAPSHOT.jar
@@ -38,9 +48,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4.6.2
         with:
-          name: LimboAPI-CTD410-${{ github.sha }}
+          name: LimboAPI-CTD${{ matrix.ctd }}-${{ github.sha }}
           if-no-files-found: warn
           path: |
-            plugin/build/libs/limboapi-*-MCExp-CTD410.jar
+            plugin/build/libs/limboapi-*-MCExp-CTD410*.jar
             plugin/build/test-results/test/TEST-*.xml
             plugin/build/reports/checkstyle/*.xml

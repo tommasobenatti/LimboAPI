@@ -58,6 +58,16 @@ public interface LimboPlayer {
 
   void disconnect(RegisteredServer server);
 
+  /**
+   * Whether this limbo handle still owns the normal handler prepared for an external server connection.
+   * A scheduler can use this to recover a failed connection without replacing another plugin's handler.
+   *
+   * @return true only while the prepared handler remains active
+   */
+  default boolean isServerConnectionPrepared() {
+    return false;
+  }
+
   void sendAbilities();
 
   void sendAbilities(int abilities, float flySpeed, float walkSpeed);

@@ -32,7 +32,9 @@ import static org.mockito.Mockito.when;
 import com.velocitypowered.api.event.player.PlayerResourcePackStatusEvent;
 import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
+import com.velocitypowered.proxy.connection.MinecraftSessionHandler;
 import com.velocitypowered.proxy.connection.client.AuthSessionHandler;
+import com.velocitypowered.proxy.connection.client.ClientConfigSessionHandler;
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer;
 import com.velocitypowered.proxy.connection.player.resourcepack.ResourcePackResponseBundle;
 import com.velocitypowered.proxy.connection.player.resourcepack.handler.ModernResourcePackHandler;
@@ -106,6 +108,24 @@ class LimboSessionHandlerImplTest {
     this.session.release();
     verify(this.limbo).onDisconnect();
     verify(this.callback, never()).onDisconnect();
+  }
+
+  @Test
+  void queuedOriginalHandlerRestoreCannotOverwriteNewNativeHandoff() {
+    EmbeddedChannel channel = new EmbeddedChannel();
+    when(this.connection.eventLoop()).thenReturn(channel.eventLoop());
+    when(this.connection.getChannel()).thenReturn(channel);
+    AtomicReference<MinecraftSessionHandler> active = new AtomicReference<>();
+    when(this.connection.getActiveSessionHandler()).thenAnswer(call -> active.get());
+    this.session = new LimboSessionHandlerImpl(this.plugin, this.limbo, this.player,
+        this.callback, StateRegistry.CONFIG, mock(ClientConfigSessionHandler.class), null, () -> "test");
+    active.set(this.session);
+    this.session.disconnected();
+    active.set(mock(ClientConfigSessionHandler.class));
+    channel.runPendingTasks();
+    verify(this.plugin, never()).setActiveSessionHandler(any(), any(), any());
+    verify(this.connection, never()).addSessionHandler(any(), any());
+    channel.finishAndReleaseAll();
   }
 
   @Test
