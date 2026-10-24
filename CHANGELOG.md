@@ -8,7 +8,8 @@
 - Honor CTD cluster admission, fully-connected queue hooks and final login lock lifecycle.
 - Close or cancel stale handoffs safely; protect login events and other plugins' replacement handlers.
 - Prevent a delayed original CONFIG restore from overwriting the next native handoff.
-- Verify 72 API regression tests and the paired native queue tests on CTD410 and411.
+- Initialize all mapping registries with Gson2.15 on CTD411; avoid Gson internal map classes.
+- Verify 73 API regression tests and the paired native queue tests on CTD410 and411.
 
 
 ## 1.1.27-MCExp-CTD410 — 2026-10-24

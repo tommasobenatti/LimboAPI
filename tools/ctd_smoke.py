@@ -17,6 +17,7 @@ import struct
 import subprocess
 import threading
 import time
+import tomllib
 import uuid
 import zipfile
 
@@ -221,6 +222,15 @@ def prepare(runtime, args, proxy_port, backend_port, http_port, pack):
     config = section(config, 'slash-servers', '')
     config = section(config, 'playercaps', '')
     config = re.sub(r'(?ms)^\[server-links\].*\Z', '', config)
+    if args.native_queue:
+        config = replace_setting(config, 'queue', 'enabled', 'true')
+        config = replace_setting(config, 'queue', 'queue-server', '\"\"')
+        config, changed = re.subn(r'(?ms)^master-proxy-ids\s*=\s*\[.*?\]',
+                                 'master-proxy-ids = [\"Proxy-1\"]', config)
+        if changed != 1:
+            raise ValueError('Expected one native master-proxy-ids setting')
+    document = tomllib.loads(config)
+    assert document['queue']['enabled'] == args.native_queue
     (runtime / 'velocity.toml').write_text(config)
 
     limbo = plugins / 'limboapi'
@@ -383,6 +393,7 @@ def main():
     parser.add_argument('--limboapi', type=Path, required=True)
     parser.add_argument('--reconnect', type=Path, required=True)
     parser.add_argument('--with-nlogin', action='store_true')
+    parser.add_argument('--native-queue', action='store_true', help='Enable the real local CTD queue; Redis stays disabled')
     parser.add_argument('--startup-only', action='store_true')
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--hold-config-seconds', type=float, default=0)
@@ -413,6 +424,7 @@ def main():
     proxy_port = reserve.getsockname()[1]
     prepare(runtime, args, proxy_port, backend.server_address[1], pack_http.server_address[1], pack_http.pack)
     report = {'runtime': str(runtime), 'proxy_bind': f'127.0.0.1:{proxy_port}', 'nlogin_included': args.with_nlogin,
+              'native_queue_enabled': args.native_queue, 'distributed_redis': False,
               'backend_bind': backend.server_address, 'pack_http_bind': pack_http.server_address,
               'limits': ['No premium account, license, production settings, database or credentials copied.',
                          'Synthetic protocol765 client; no resource rendering, auth success or playable world asserted.',
@@ -485,15 +497,45 @@ def main():
         report['backend_events'] = backend.events
         text = (runtime / 'console.log').read_text(errors='replace')
         report['binary_errors'] = re.findall(r'(?m)^.*(?:NoSuchMethodError|NoSuchFieldError|ClassNotFoundException|'
-                                            r'NoClassDefFoundError|ExceptionInInitializerError|IllegalReferenceCountException).*$' , text)
+                                            r'NoClassDefFoundError|ExceptionInInitializerError|ClassCastException|IllegalReferenceCountException).*$' , text)
+        report['error_lines'] = [line for line in text.splitlines() if ' ERROR]' in line or ' ERROR ' in line]
+        report['plugins_loaded'] = all('Loaded plugin ' + name + ' ' in text for name in ('limboapi', 'limboreconnect'))
         report['forcepack_success_observed'] = 'sent status: SUCCESSFUL' in text
         report['api_reload_completions'] = text.count('SMOKE LimboAPI reload complete')
         report['reconnect_reload_completions'] = text.count('LimboReconnect reloaded')
         report['nlogin_profile_hook_active'] = 'Hooking all GameProfileRequestEvent events from nlogin' in text
         report['upstream_version_check_failed'] = 'Error contacting GitHub for version comparison' in text
         report['process_exit'] = process.returncode if process is not None else None
+        report['listeners_closed'] = True
+        for port in (proxy_port, backend.server_address[1], pack_http.server_address[1]):
+            with socket.socket() as probe:
+                probe.settimeout(1)
+                report['listeners_closed'] &= probe.connect_ex(('127.0.0.1', port)) != 0
+        checks = {'startup': report.get('startup_done', False), 'plugins_loaded': report['plugins_loaded'],
+                  'no_binary_errors': not report['binary_errors'], 'no_errors': not report['error_lines'],
+                  'graceful_exit': report['process_exit'] == 0, 'listeners_closed': report['listeners_closed']}
+        if not args.startup_only:
+            checks.update({'three_config_logins': len(report.get('attempts', [])) == 3 and all(
+                attempt.get('login_success') and attempt.get('config_finished') and
+                attempt.get('pack_statuses_sent') == ['ACCEPTED', 'DOWNLOADED', 'SUCCESSFUL']
+                for attempt in report.get('attempts', [])),
+                'pack_success': report['forcepack_success_observed'],
+                'reloads': report['api_reload_completions'] == 2 and report['reconnect_reload_completions'] == 2,
+                'configs_preserved': len(report.get('reloads', [])) == 2 and all(
+                    record['unchanged'] and record['comment_and_empty_unknown_list_preserved']
+                    for record in report.get('reloads', []))})
+            if args.hold_config_seconds:
+                checks['same_socket_hold'] = bool(report.get('attempts')) and report['attempts'][0].get(
+                    'same_connection_hold_completed', False) and report['attempts'][0].get(
+                    'same_connection_hold_seconds', 0) >= args.hold_config_seconds
+            if args.with_nlogin:
+                checks['nlogin_profile_hook'] = report['nlogin_profile_hook_active']
+        report['verification_failures'] = [name for name, passed in checks.items() if not passed]
+        report['passed'] = not report['verification_failures']
         (runtime / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report, indent=2), flush=True)
+    if not report['passed']:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

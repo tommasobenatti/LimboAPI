@@ -1,0 +1,168 @@
+{
+  "native_queue_enabled": true,
+  "distributed_redis": false,
+  "nlogin_included": false,
+  "startup_done": true,
+  "plugins_loaded": true,
+  "attempts": [
+    {
+      "label": "initial",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 26
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "030251a1-fa62-36d5-92f4-4f9df64a42ae",
+        "url": "http://127.0.0.1:<ephemeral>/pack.zip",
+        "sha1": "b07c86870051c06d4ad1bfcdf1d81ae020000ad2"
+      },
+      "same_connection_hold_seconds": 36.005070541999885,
+      "same_connection_hold_completed": true,
+      "packets_received_during_hold": [],
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    },
+    {
+      "label": "repeat",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 26
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "030251a1-fa62-36d5-92f4-4f9df64a42ae",
+        "url": "http://127.0.0.1:<ephemeral>/pack.zip",
+        "sha1": "b07c86870051c06d4ad1bfcdf1d81ae020000ad2"
+      },
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    },
+    {
+      "label": "after-same-session-hold",
+      "status_response": {
+        "packet": 0,
+        "version": {
+          "protocol": 765,
+          "name": "Velocity-CTD 1.7.2-26.3"
+        }
+      },
+      "client_packets": [
+        {
+          "state": "login",
+          "id": 2,
+          "bytes": 26
+        },
+        {
+          "state": "config",
+          "id": 7,
+          "bytes": 218
+        },
+        {
+          "state": "config",
+          "id": 2,
+          "bytes": 0
+        }
+      ],
+      "login_success": true,
+      "resource_pack": {
+        "uuid": "030251a1-fa62-36d5-92f4-4f9df64a42ae",
+        "url": "http://127.0.0.1:<ephemeral>/pack.zip",
+        "sha1": "b07c86870051c06d4ad1bfcdf1d81ae020000ad2"
+      },
+      "pack_statuses_sent": [
+        "ACCEPTED",
+        "DOWNLOADED",
+        "SUCCESSFUL"
+      ],
+      "config_finished": true
+    }
+  ],
+  "reloads": [
+    {
+      "number": 1,
+      "sha256_before": {
+        "plugins/limboapi/config.yml": "3bba2f51dbb188998520e3fbad3002d54de8fdb455a877d026d98dba41df171e",
+        "plugins/limboreconnect/config.yml": "b9f4eea79c74ac3acad9ce0ca05eabea01a831a2b49c4410ef7f6e53cc892b1c"
+      },
+      "sha256_after": {
+        "plugins/limboapi/config.yml": "3bba2f51dbb188998520e3fbad3002d54de8fdb455a877d026d98dba41df171e",
+        "plugins/limboreconnect/config.yml": "b9f4eea79c74ac3acad9ce0ca05eabea01a831a2b49c4410ef7f6e53cc892b1c"
+      },
+      "unchanged": true,
+      "comment_and_empty_unknown_list_preserved": true
+    },
+    {
+      "number": 2,
+      "sha256_before": {
+        "plugins/limboapi/config.yml": "3bba2f51dbb188998520e3fbad3002d54de8fdb455a877d026d98dba41df171e",
+        "plugins/limboreconnect/config.yml": "b9f4eea79c74ac3acad9ce0ca05eabea01a831a2b49c4410ef7f6e53cc892b1c"
+      },
+      "sha256_after": {
+        "plugins/limboapi/config.yml": "3bba2f51dbb188998520e3fbad3002d54de8fdb455a877d026d98dba41df171e",
+        "plugins/limboreconnect/config.yml": "b9f4eea79c74ac3acad9ce0ca05eabea01a831a2b49c4410ef7f6e53cc892b1c"
+      },
+      "unchanged": true,
+      "comment_and_empty_unknown_list_preserved": true
+    }
+  ],
+  "binary_errors": [],
+  "error_lines": [],
+  "forcepack_success_observed": true,
+  "api_reload_completions": 2,
+  "reconnect_reload_completions": 2,
+  "process_exit": 0,
+  "listeners_closed": true,
+  "verification_failures": [],
+  "passed": true,
+  "scope": "CTD411/ForcePack synthetic login+CONFIG+reload. No live PLAY backend restart, premium/password authentication or multi-proxy Redis.",
+  "artifact_stage": "Post-fix pre-commit source validation. Final release jar hashes and source revision are tracked in release PROVENANCE.json."
+}

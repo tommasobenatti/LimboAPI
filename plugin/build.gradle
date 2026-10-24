@@ -57,6 +57,9 @@ dependencies() {
 test {
   useJUnitPlatform()
   jvmArgs("-XX:+EnableDynamicAgentLoading", "--enable-native-access=ALL-UNNAMED")
+  if (providers.gradleProperty("velocityCtdJar").isPresent()) {
+    classpath = files(providers.gradleProperty("velocityCtdJar").get()) + classpath
+  }
 }
 
 tasks.named("spotbugsTest") {

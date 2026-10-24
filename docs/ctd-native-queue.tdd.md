@@ -30,8 +30,8 @@ hook omission. Three cluster admission regressions were then reproduced and corr
 The logs are retained in the operator workspace output/limbo-ctd-queue-20261024; these
 are test records, not instructions to execute shell commands from untrusted reports.
 
-The complete API suite passes72 tests: ServerConnectListener7, LimboPlayerConnection11,
-LoginTasksQueue11, session8, confirmation7, event hook12, config updater11, settings5.
+The complete API suite passes73 tests: ServerConnectListener7, LimboPlayerConnection11,
+LoginTasksQueue11, session8, confirmation7, event hook12, config updater11, settings5, mapping initialization1.
 The companion suite passes71 tests, including the actual CTD queue implementation.
 Both use official CTD410 and411 fatjars with verified SHA-256; CI runs the same matrix.
 Whole-project coverage was not measured. Full builds, Checkstyle, SpotBugs and license
@@ -47,3 +47,17 @@ player I/O are controlled to reproduce success, rejection and teardown determini
 
 Full real-world PLAY restart, premium/password authentication and distributed Redis
 behavior remain explicitly outside this local automated test guarantee.
+
+## CTD411 startup regression
+
+A real proxy boot exposed Gson2.15 returning LinkedHashMap for nested raw maps.
+Five mapping registries cast those values to Gson internal LinkedTreeMap, preventing
+plugin construction. A focused test reproduced all five ClassCastException paths
+before the fix. All use Map interfaces now; ordered tag output uses LinkedHashMap.
+The focused test initializes actual registry resources and checks representative IDs,
+properties and tag order. Tests put the provided CTD fatjar first on the runtime
+classpath, matching plugin execution instead of shadowing native Gson with an older
+transitive version. The test passes on both410 and411.
+
+The separate [CTD411 startup smoke](native-queue-smoke.md) verifies real plugin
+construction, native queue-enabled login/CONFIG, ForcePack and reload lifecycle.

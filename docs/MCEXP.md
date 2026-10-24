@@ -5,7 +5,7 @@
 - Java 25 or later; build with JDK 25.
 - Velocity-CTD 4.3.1-SNAPSHOT builds410 and411 verified. The baseline CTD tree at
   `cf46d4000d252124c280f6361166df57f3d0f7f3` matched build 410 when verified on 24 October 2026.
-- Use the paired MCExp LimboAPI 1.1.27-MCExp-CTD410.1 and LimboReconnect 1.1.7-MCExp-CTD410.
+- Use the paired MCExp LimboAPI 1.1.27-MCExp-CTD410.1 and LimboReconnect 1.1.7-MCExp-CTD410.1.
 - Actual integration inputs: ForcePack 1.3.75-SNAPSHOT and nLogin 2.0.18.
 
 Changes address the reported removed-method login error and concrete event/session
@@ -59,17 +59,17 @@ From this repository with JDK 25 selected through `JAVA_HOME`:
   -PmappingsJar=/absolute/path/to/limboapi-upstream-bfef579.jar
 ```
 
-Result: `plugin/build/libs/limboapi-1.1.27-MCExp-CTD410.jar`.
+Result: `plugin/build/libs/limboapi-1.1.27-MCExp-CTD410.1.jar`.
 Supply `velocityCtdJar` explicitly: building against the old upstream dependency is
 not the verified CTD path. No Velocity or test classes are bundled. SnakeYAML 2.5 is shaded privately.
 
 ## Validation and limitations
 
-72 focused tests pass, with zero skipped/failed tests. Compilation, Checkstyle,
-SpotBugs and license tasks pass. The paired `.1` build totals 143 tests. Whole-project coverage was
+73 focused tests pass, with zero skipped/failed tests. Compilation, Checkstyle,
+SpotBugs and license tasks pass. The paired `.1` build totals 144 tests. Whole-project coverage was
 not measured and the audit was scoped to login, resource packs, reconnect and resource lifecycle.
 
-The isolated smoke used real CTD/ForcePack/nLogin jars, offline protocol 765,
+The historical CTD410 smoke used real CTD/ForcePack/nLogin jars, offline protocol 765,
 a local pack and a fake backend. One same-socket CONFIG hold measured 36.00048s;
 three logins and two reloads of each plugin passed with unchanged config hashes,
 active nLogin profile mutation and successful ForcePack statuses. The sandbox's
@@ -95,23 +95,22 @@ the uploaded binary. Release publication triggers another read-only CI check.
 
 ## Reproduce the isolated smoke
 
-The Python standard-library fixture is [tools/ctd_smoke.py](../tools/ctd_smoke.py).
+The Python3.11+ standard-library fixture is [tools/ctd_smoke.py](../tools/ctd_smoke.py).
 It requires a local JDK and locally owned third-party jars; none is committed or redistributed.
 Its private `tools/runtime-*` folders are ignored by Git. It binds only loopback random ports.
 
 ```sh
 python3 tools/ctd_smoke.py \
   --ctd /absolute/path/to/velocity-ctd-fatjar-4.3.1-SNAPSHOT-410.jar \
-  --limboapi /absolute/path/to/limboapi-1.1.27-MCExp-CTD410.jar \
-  --reconnect /absolute/path/to/LimboReconnect-1.1.7-MCExp-CTD410.jar \
+  --limboapi /absolute/path/to/limboapi-1.1.27-MCExp-CTD410.1.jar \
+  --reconnect /absolute/path/to/LimboReconnect-1.1.7-MCExp-CTD410.1.jar \
   --forcepack /absolute/path/to/forcepack.jar \
-  --nlogin /absolute/path/to/nlogin.jar --with-nlogin --hold-config-seconds 36
+  --native-queue --hold-config-seconds 36
 ```
 
 Read the generated report and console: process startup alone does not establish success.
 Expected: three complete login/CONFIG attempts, first same-socket hold at least36s,
-ForcePack SUCCESSFUL, both reload counters2, unchanged config hashes, nLogin profile
-hook active, no binary/ERROR messages and graceful proxy exit0. The fixture uses only
+ForcePack SUCCESSFUL, both reload counters2, unchanged config hashes, no binary/ERROR messages and graceful proxy exit0. The fixture uses only
 fresh test defaults, an empty local pack and a synthetic backend; it never loads production data.
 
 
@@ -149,3 +148,14 @@ entry and event-manager code from official CTD410/411; a real multi-proxy Redis 
 and an in-game PLAY backend restart remain staging checks. The earlier successful
 nLogin2.0.18 smoke and the later license-unlinked refusal are historical validation
 boundaries, not a claim that current premium authentication was retested.
+
+CTD411 upgrades Gson to2.15. Mapping registries now deserialize through the public
+Map interface, preserving ordered tag output without casting Gson internal classes.
+A real mapping initialization regression runs with the CTD fatjar first on the test
+classpath, matching the proxy runtime. The smoke fixture accepts `--native-queue`,
+checks both plugins loaded and reports failure via a nonzero exit if initialization,
+login, reload, pack completion, config preservation or shutdown checks fail.
+
+Add `--nlogin /absolute/path/to/nlogin.jar --with-nlogin` only with a locally owned,
+validly licensed nLogin input. License refusal is a failed smoke, not a passing auth
+check. No third-party jar or license is distributed with this project.

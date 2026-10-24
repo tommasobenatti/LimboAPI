@@ -13,16 +13,18 @@ while the native queue owns priority, capacity and retry policy. [Queue integrat
 These binaries are specific to CTD and are not advertised as drop-in upstream Velocity builds.
 
 The CTD login lifecycle, nLogin profile events, ForcePack resource-pack responses,
-event futures and session cleanup are adapted and covered by 72 regression tests.
+event futures and session cleanup are adapted and covered by 73 regression tests.
 
-The paired build passed an isolated test with actual ForcePack 1.3.75-SNAPSHOT and
-nLogin 2.0.18, including a 36-second CONFIG connection and two reloads of each plugin.
-The client and backend were synthetic; real PLAY restart/reconnect, rendering and
-premium/password authentication still require an in-game staging check.
+The earlier CTD410 build passed a synthetic CONFIG test with ForcePack1.3.75-SNAPSHOT
+and nLogin2.0.18. A later nLogin run refused logins because its local license was
+unlinked; premium/password authentication was not retested. The queue release has
+separate CTD411/ForcePack startup evidence. Real PLAY restart/reconnect, rendering
+and distributed Redis still require staging checks; see the linked reports.
 
 - [Build, installation and release notes](docs/MCEXP.md)
 - [Changelog](CHANGELOG.md)
 - [Regression evidence](docs/velocity-ctd-compatibility.tdd.md)
+- [Queue-release CTD411 startup result](docs/native-queue-smoke.md)
 - [Isolated compatibility result](docs/smoke-verification.md)
 
 The upstream project information follows below.
