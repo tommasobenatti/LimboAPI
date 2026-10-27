@@ -17,6 +17,8 @@
 
 package net.elytrium.limboapi.server;
 
+import com.velocitypowered.api.event.player.configuration.PlayerEnterConfigurationEvent;
+import com.velocitypowered.api.event.player.configuration.PlayerEnteredConfigurationEvent;
 import com.velocitypowered.api.network.ProtocolVersion;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.proxy.connection.MinecraftConnection;
@@ -107,6 +109,8 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
   private boolean joinGameTriggered;
   private boolean released;
   private boolean disconnected;
+  private CompletableFuture<?> configurationEntry;
+  private boolean configurationStartSent;
 
   public LimboSessionHandlerImpl(LimboAPI plugin, LimboImpl limbo, ConnectedPlayer player,
       LimboSessionHandler callback, StateRegistry originalState, MinecraftSessionHandler originalHandler,
@@ -223,12 +227,75 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
         if (this.disconnected || this.player.getConnection().isClosed()) {
           return;
         }
-        this.player.getConnection().write(StartUpdatePacket.INSTANCE);
         this.configTransition.thenRun(this::disconnected).thenRun(runnable);
+        this.startConfiguration(() -> this.player.getConnection().write(StartUpdatePacket.INSTANCE));
       }, this.player.getConnection().eventLoop());
     } else {
-      this.player.getConnection().write(StartUpdatePacket.INSTANCE);
       this.configTransition.thenRun(this::disconnected).thenRun(runnable);
+      this.startConfiguration(() -> this.player.getConnection().write(StartUpdatePacket.INSTANCE));
+    }
+  }
+
+  void startConfiguration(Runnable sendStartUpdate) {
+    MinecraftConnection connection = this.player.getConnection();
+    if (!this.ownsConnection()
+        || connection.getState() == StateRegistry.CONFIG
+        || this.configurationEntry != null
+        || this.configurationStartSent) {
+      return;
+    }
+
+    try {
+      CompletableFuture<?> entry =
+          this.plugin
+              .getServer()
+              .getEventManager()
+              .fire(
+                  new PlayerEnterConfigurationEvent(
+                      this.player, this.player.getConnectionInFlightOrConnectedServer()));
+      this.configurationEntry = entry;
+      entry
+          .completeOnTimeout(null, 5, TimeUnit.SECONDS)
+          .thenRunAsync(
+              () -> {
+                this.configurationEntry = null;
+                if (this.ownsConnection()) {
+                  this.configurationStartSent = true;
+                  sendStartUpdate.run();
+                }
+              },
+              connection.eventLoop())
+          .exceptionally(
+              throwable -> {
+                this.failConfigurationEntry();
+                return null;
+              });
+    } catch (RuntimeException exception) {
+      this.failConfigurationEntry();
+    }
+  }
+
+  private boolean ownsConnection() {
+    return !this.disconnected
+        && !this.player.getConnection().isClosed()
+        && this.player.getConnection().getActiveSessionHandler() == this;
+  }
+
+  private void failConfigurationEntry() {
+    MinecraftConnection connection = this.player.getConnection();
+    try {
+      connection
+          .eventLoop()
+          .execute(
+              () -> {
+                if (this.ownsConnection()) {
+                  connection.close();
+                }
+              });
+    } catch (RuntimeException exception) {
+      if (this.ownsConnection()) {
+        connection.getChannel().close();
+      }
     }
   }
 
@@ -236,7 +303,21 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
   public boolean handle(FinishedUpdatePacket packet) {
     // Switching to CONFIG state
     if (this.player.getConnection().getState() != StateRegistry.CONFIG) {
+      if (!this.configurationStartSent || !this.ownsConnection()) {
+        this.failConfigurationEntry();
+        return true;
+      }
+      this.configurationStartSent = false;
       this.plugin.setActiveSessionHandler(this.player.getConnection(), StateRegistry.CONFIG, this);
+      this.plugin
+          .getServer()
+          .getEventManager()
+          .fireAndForget(
+              new PlayerEnteredConfigurationEvent(
+                  this.player, this.player.getConnectionInFlightOrConnectedServer()));
+      if (!this.ownsConnection()) {
+        return true;
+      }
 
       if (!this.loaded && !this.disconnecting) {
         this.limbo.spawnPlayerLocal(this.callback.getClass(), this, this.player, this.player.getConnection());
@@ -247,7 +328,8 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
         this.player.getConnection().closeWith(this.plugin.getPackets().getInvalidSwitch());
 
         if (Settings.IMP.MAIN.LOGGING_ENABLED) {
-          LimboAPI.getLogger().warn("{} sent an unexpected state switch confirmation.", this.player);
+          LimboAPI.getLogger()
+              .warn("{} sent an unexpected state switch confirmation.", this.player);
         }
       }
 
@@ -485,6 +567,10 @@ public class LimboSessionHandlerImpl implements MinecraftSessionHandler {
       return;
     }
     this.disconnected = true;
+    if (this.configurationEntry != null) {
+      this.configurationEntry.cancel(false);
+      this.configurationEntry = null;
+    }
     this.release();
 
     if (Settings.IMP.MAIN.LOGGING_ENABLED) {

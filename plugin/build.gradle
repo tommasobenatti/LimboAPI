@@ -62,6 +62,32 @@ test {
   }
 }
 
+// Optional integration lane: use the operator's actual VSA jar without bundling it.
+if (providers.gradleProperty("velocityScoreboardJar").isPresent()) {
+  sourceSets {
+    scoreboardTest {
+      compileClasspath += sourceSets.main.output + sourceSets.test.compileClasspath
+      runtimeClasspath += output + compileClasspath + sourceSets.test.runtimeClasspath
+    }
+  }
+  dependencies {
+    scoreboardTestImplementation(files(providers.gradleProperty("velocityScoreboardJar").get()))
+  }
+  tasks.register("scoreboardTest", Test) {
+    testClassesDirs = sourceSets.scoreboardTest.output.classesDirs
+    classpath = sourceSets.scoreboardTest.runtimeClasspath
+    if (providers.gradleProperty("velocityCtdJar").isPresent()) {
+      classpath = files(providers.gradleProperty("velocityCtdJar").get()) + classpath
+    }
+    useJUnitPlatform()
+    jvmArgs("-XX:+EnableDynamicAgentLoading", "--enable-native-access=ALL-UNNAMED")
+  }
+  tasks.named("spotbugsScoreboardTest") {
+    auxClassPaths.from(sourceSets.main.output, sourceSets.scoreboardTest.runtimeClasspath, configurations.compileClasspath)
+  }
+  check.dependsOn(tasks.named("scoreboardTest"))
+}
+
 tasks.named("spotbugsTest") {
   auxClassPaths.from(sourceSets.main.output, sourceSets.test.runtimeClasspath, configurations.compileClasspath)
 }

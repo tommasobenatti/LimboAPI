@@ -446,7 +446,7 @@ public class LimboImpl implements Limbo {
       if (connection.getState() != StateRegistry.CONFIG) {
         if (this.shouldRejoin) {
           // Switch to CONFIG state
-          connection.write(this.configTransitionPackets);
+          sessionHandler.startConfiguration(() -> connection.write(this.configTransitionPackets));
           return; // Continue transition on the handler side
         }
       } else {

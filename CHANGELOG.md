@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — scoreboard reconfiguration
+
+- Notify native CONFIG entry/ack events during limbo entry and backend handoff.
+- Restore VSA/TAB sidebar packets after reconnect while preserving /sb choices.
+- Guard asynchronous entry ownership, disconnects and premature acknowledgements.
+- Add 12 lifecycle regressions and an optional actual VSA integration lane (3 tests).
+- Verify CTD410/411 builds and record operator confirmation of the deployed sidebar fix.
+- See docs/scoreboard-reconfiguration.tdd.md for RED/GREEN evidence and validation scope.
+
 ## 1.1.27-MCExp-CTD410.1 — 2026-10-24
 
 - Bridge authenticated native server requests out of limbo without creating a second connection.

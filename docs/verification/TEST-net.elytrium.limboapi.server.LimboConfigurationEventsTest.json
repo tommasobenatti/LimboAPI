@@ -1,0 +1,56 @@
+{
+  "tests": 12,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "physicalDisconnectCancelsAnAwaitedEntryWithoutResumingIt()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "duplicateStartsShareOneNativeEntryAndOneStartPacket()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "limboEntryAndLaterExitEachNotifyOneRealConfigurationTransition()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "ownershipChangedByAnEnteredListenerPreventsAStaleSpawn()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "acknowledgementBeforeStartUpdateCannotSpawnOrCompleteAHandoff()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "noRejoinLimboKeepsPlayWithoutSyntheticConfigurationEvents()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "nativeEnterListenersFinishBeforeStartUpdateAndEnteredWaitsForTheAck()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "failedNativeEntryClosesOnlyItsStillOwnedConnection()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "realLimboEntryWaitsForTheNativeEventBeforeItsPreparedStartPacket()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "replacementOwnerDuringAnAwaitedEntryIsNeverWrittenOrClosed()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "initialLoginAlreadyInConfigDoesNotInventConfigurationEntryEvents()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    },
+    {
+      "name": "failedNativeEntryCannotCloseTheReplacementOwner()",
+      "classname": "net.elytrium.limboapi.server.LimboConfigurationEventsTest"
+    }
+  ]
+}

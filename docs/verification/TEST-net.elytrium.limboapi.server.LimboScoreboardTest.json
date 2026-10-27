@@ -1,0 +1,20 @@
+{
+  "tests": 3,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    {
+      "name": "exitNotifiesNativeFreezeExactlyOnceBeforeSendingStartUpdate()",
+      "classname": "net.elytrium.limboapi.server.LimboScoreboardTest"
+    },
+    {
+      "name": "voluntarilyHiddenSidebarRemainsHidden()",
+      "classname": "net.elytrium.limboapi.server.LimboScoreboardTest"
+    },
+    {
+      "name": "nativeFinishRestoresTheExistingSidebarWithoutAToggle()",
+      "classname": "net.elytrium.limboapi.server.LimboScoreboardTest"
+    }
+  ]
+}
